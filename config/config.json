@@ -1,0 +1,80 @@
+{
+  "llm": {
+    "qwen": {
+      "model": "qwen1.5-32b-chat",
+      "base_url": "http://192.168.10.80:7000/v1",
+      "api_key": "EMPTY"
+    },
+    "baichuan": {
+      "model": "baichuan2-13b-chat",
+      "base_url": "http://192.168.10.81:7000/v1",
+      "api_key": "EMPTY"
+    },
+    "kimi": {
+      "model": "moonshot-v1-32k",
+      "base_url": "https://api.moonshot.cn/v1",
+      "api_key": "sk-7UFRd5CxYaMpK38c9wGxOlmoJZjc9hKoZ9XBbS3eZTnm9U3A"
+    }
+  },
+  "milvus": {
+    "host": "127.0.0.1",
+    "port": 19530
+  },
+  "milvus_api_server": {
+    "host": "127.0.0.1",
+    "port": 8801
+  },
+  "name_convention": {
+    "database_prefix": "MilvusDB_",
+    "collection_qa_prefix": "Collection_QA_",
+    "collection_doc_prefix": "Collection_DOC_"
+  },
+  "index_params": {
+    "metric_type": "L2",
+    "index_type": "FLAT",
+    "params": {
+      "nlist": 128
+    }
+  },
+  "search_params": {
+    "metric_type": "L2",
+    "params": {
+      "nprobe": 128
+    }
+  },
+  "api_key": "2024_hello_ai",
+  "embedding_model_path": "/data/embeddings/bge-large-zh-v1.5",
+  "convert_qa_to_doc": "yes",
+  "SERPAPI_API_KEY": "ae43b25aa260867c95768b1a5d5acc50ce658b77bb561b77d39410580a9707d1",
+  "split": {
+    "chunk_size": 1000,
+    "overlap": 100
+  },
+  "mysql": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "peilian",
+    "password": "CDzPZphYBSY4mWKJ",
+    "db_name": "peilian"
+  },
+  "chat_effect_param": {
+    "general": {
+      "multi_chat_remember_rounds": 6,
+      "open_llm_free_answer": "yes",
+      "open_llm_internet_answer": "no"
+    },
+    "llm_generate": {
+      "top_p": 0.5,
+      "temperature": 0.5,
+      "max_tokens": 2048,
+      "frequency_penalty": 1.2,
+      "system_prompt": "你是一个人工智能客服助手，名字叫良师益友，是由良师益友团队训练和开发的大预言模型。"
+    },
+    "knowledge": {
+      "qa_hit_score": 0.2,
+      "qa_similar_score": 0.7,
+      "doc_hit_score": 2,
+      "rag_doc_counts": 3
+    }
+  }
+}

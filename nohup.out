@@ -1,0 +1,105 @@
+/data/miniconda3/envs/milvus_env/lib/python3.10/site-packages/langchain/_api/module_import.py:92: LangChainDeprecationWarning: Importing load_tools from langchain.agents is deprecated. Please replace deprecated imports:
+
+>> from langchain.agents import load_tools
+
+with new imports of:
+
+>> from langchain_community.agent_toolkits.load_tools import load_tools
+You can use the langchain cli to **automatically** upgrade many imports. Please see documentation here <https://python.langchain.com/v0.2/docs/versions/v0_2/>
+  warn_deprecated(
+Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+ * Serving Flask app 'app_chat_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8802
+ * Running on http://172.17.0.13:8802
+[33mPress CTRL+C to quit[0m
+106.54.25.147 - - [23/Jul/2024 01:00:49] "GET /socket.io/?transport=polling&EIO=4&t=1721667649.1464822 HTTP/1.1" 200 -
+客户端已经链接
+===>>join room: {'session_id': '1000000000009999', 'user_id': 'songjianpig'}
+session_id=1000000000009999, user_id=songjianpig
+add session from mysql: 1000000000009999
+===>>begin to chat: {'prompt': '介绍一下益师智友', 'history': [], 'session_id': '1000000000009999', 'tenant_code': 'xiaomi', 'collection_name': 'xiaoshou', 'user_id': 'songjianpig'}
+====>get_chat_effect_param(),chat_effect_param={
+  "general": {
+    "multi_chat_remember_rounds": 6,
+    "open_llm_free_answer": "yes",
+    "open_llm_internet_answer": "no"
+  },
+  "llm_generate": {
+    "top_p": 0.5,
+    "temperature": 0.5,
+    "max_tokens": 2048,
+    "frequency_penalty": 1.2,
+    "system_prompt": "你是一个人工智能客服助手，名字叫良师益友，是由良师益友团队训练和开发的大预言模型。"
+  },
+  "knowledge": {
+    "qa_hit_score": 0.2,
+    "qa_similar_score": 0.7,
+    "doc_hit_score": 2,
+    "rag_doc_counts": 3
+  }
+}
+=====>params_dic=%s {
+  "prompt": "介绍一下益师智友",
+  "history": [],
+  "session_id": "1000000000009999",
+  "tenant_code": "xiaomi",
+  "collection_name": "xiaoshou",
+  "stream": true,
+  "chat_effect_params": {
+    "general": {
+      "multi_chat_remember_rounds": 6,
+      "open_llm_free_answer": "yes",
+      "open_llm_internet_answer": "no"
+    },
+    "llm_generate": {
+      "top_p": 0.5,
+      "temperature": 0.5,
+      "max_tokens": 2048,
+      "frequency_penalty": 1.2,
+      "system_prompt": "你是一个人工智能客服助手，名字叫良师益友，是由良师益友团队训练和开发的大预言模型。"
+    },
+    "knowledge": {
+      "qa_hit_score": 0.2,
+      "qa_similar_score": 0.7,
+      "doc_hit_score": 2,
+      "rag_doc_counts": 3
+    }
+  }
+}
+=====>current query is:介绍一下益师智友, context_intent is:介绍一下益师智友
+request milvus server：tenant_code=xiaomi, collection_name=xiaoshou, collection_type=QA, query=介绍一下益师智友, filter_expr=, limit=5
+request milvus server：tenant_code=xiaomi, collection_name=xiaoshou, collection_type=DOC, query=介绍一下益师智友, filter_expr=, limit=5
+====>doc_hit_indices=[0, 1, 2]
+=====>hit doc:query=介绍一下益师智友, context_intent=介绍一下益师智友
+prompt given to LLM_NAME.KIMI=介绍一下益师智友
+====>req_dic to llm is :{
+  "model": "moonshot-v1-32k",
+  "max_tokens": 2048,
+  "stream": true,
+  "temperature": 0.3,
+  "top_p": 0.1
+}
+更新会话成功：sesssion_id=1000000000009999
+save chat session to mysql completed。1000000000009999
+===>>leave room: {'session_id': '1000000000009999'}
+session_id=1000000000009999, user_id=None
+===>>remove_session:1000000000009999
+message handler error
+Traceback (most recent call last):
+  File "/data/miniconda3/envs/milvus_env/lib/python3.10/site-packages/engineio/server.py", line 434, in run_handler
+    return self.handlers[event](*args)
+  File "/data/miniconda3/envs/milvus_env/lib/python3.10/site-packages/socketio/server.py", line 645, in _handle_eio_message
+    self._handle_disconnect(eio_sid, pkt.namespace)
+  File "/data/miniconda3/envs/milvus_env/lib/python3.10/site-packages/socketio/server.py", line 567, in _handle_disconnect
+    self._trigger_event('disconnect', namespace, sid)
+  File "/data/miniconda3/envs/milvus_env/lib/python3.10/site-packages/socketio/server.py", line 614, in _trigger_event
+    return handler(*args)
+  File "/data/miniconda3/envs/milvus_env/lib/python3.10/site-packages/flask_socketio/__init__.py", line 282, in _handler
+    return self._handle_event(handler, message, namespace, sid,
+  File "/data/miniconda3/envs/milvus_env/lib/python3.10/site-packages/flask_socketio/__init__.py", line 827, in _handle_event
+    ret = handler(*args)
+TypeError: handle_disconnect() missing 1 required positional argument: 'data'
+106.54.25.147 - - [23/Jul/2024 01:01:08] "GET /socket.io/?transport=websocket&EIO=4&sid=kyqZK7opnWqPC6taAAAA&t=1721667649.1619346 HTTP/1.1" 200 -

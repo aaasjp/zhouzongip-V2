@@ -1,0 +1,6 @@
+logs/
+results/
+tmp/
+venv/
+env/
+__pycache__/
