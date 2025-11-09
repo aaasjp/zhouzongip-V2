@@ -47,7 +47,7 @@ def post_request(url, data, show_request=True):
             print(f"\n请求URL: {url}")
             print(f"请求数据: {json.dumps(data, ensure_ascii=False, indent=2)}")
         
-        response = requests.post(url, json=data, timeout=30)
+        response = requests.post(url, json=data, timeout=300)
         response.raise_for_status()
         result = response.json()
         

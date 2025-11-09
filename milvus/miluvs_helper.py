@@ -242,7 +242,7 @@ def upsert_qa_to_collection(tenant_code, collection_name, question_list, answer_
 
 def insert_docs_to_collection(tenant_code, collection_name, doc_name_list, doc_content_list, source_list,
                               metadata_list):
-    print("调用方法:insert_doc_to_collection，参数为:tenant_code=%s, collection_name=%s", tenant_code, collection_name)
+    print(f"调用方法:insert_doc_to_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}")
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
 
@@ -318,7 +318,7 @@ def insert_docs_to_collection(tenant_code, collection_name, doc_name_list, doc_c
 
 
 def delete_qa_from_collection(tenant_code, collection_name, question_list):
-    print("调用方法:delete_qa_from_collection，参数为:tenant_code=%s, collection_name=%s", tenant_code, collection_name)
+    print(f"调用方法:delete_qa_from_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}")
     print(f'to be deleted question_list:\n')
     for q in question_list:
         print(q)
@@ -365,7 +365,7 @@ def delete_qa_from_collection(tenant_code, collection_name, question_list):
 
 
 def delete_docs_from_collection(tenant_code, collection_name, doc_name_list):
-    print("调用方法:delete_docs_from_collection，参数为:tenant_code=%s, collection_name=%s", tenant_code, collection_name)
+    print(f"调用方法:delete_docs_from_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}")
 
     print(f'to be deleted doc_name_list:\n')
     for d in doc_name_list:
@@ -399,8 +399,7 @@ def delete_docs_from_collection(tenant_code, collection_name, doc_name_list):
 
 
 def search_from_collection(tenant_code, collection_name, collection_type, query_list, filter_expr, limit=5):
-    print("调用方法:search_from_collection，参数为:tenant_code=%s, collection_name=%s, collection_type=%s, query=%s",
-                tenant_code, collection_name, collection_type, query_list)
+    print(f"调用方法:search_from_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, collection_type={collection_type}, query={query_list}")
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
 
