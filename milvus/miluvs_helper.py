@@ -2,6 +2,7 @@ from pymilvus import connections, utility, FieldSchema, CollectionSchema, DataTy
 import json
 from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+import torch
 #from config.log_config_vector_db import setup_logging
 
 import logging
@@ -14,9 +15,17 @@ DOC_FROM_QA_SOURCE = 'CONVERT_FROM_QA'
 with open('./config/config.json', 'r') as f:
     config = json.load(f)
 
+# 检测CUDA是否可用
+try:
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    logger.info(f"检测到设备: {device}")
+except ImportError:
+    device = 'cpu'
+    logger.warning("未安装torch，使用CPU设备")
+
 embedding_model = HuggingFaceBgeEmbeddings(
     model_name=config['embedding_model_path'],
-    model_kwargs={'device': 'cpu'},
+    model_kwargs={'device': device},
     encode_kwargs={'normalize_embeddings': True}  # set True to compute cosine similarity
 )
 

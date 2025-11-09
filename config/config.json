@@ -76,5 +76,10 @@
       "doc_hit_score": 2,
       "rag_doc_counts": 3
     }
+  },
+  "ocr_service": {
+    "base_url": "http://127.0.0.1:8000",
+    "parse_mode": "accuracy",
+    "timeout": 3000
   }
 }

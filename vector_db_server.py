@@ -4,6 +4,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 import os
+import json
+from urllib.parse import urlparse
 from flask import Flask, request, jsonify
 from milvus.miluvs_helper import *
 from utils.auth_check import *
@@ -45,8 +47,6 @@ def new_collection():
         is_succ, msg = create_collection(tenant_code, collection_name)
         if not is_succ:
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
-
-        SQLDatabase().upsert_chat_effect_param(tenant_code, collection_name, params=config['chat_effect_param'])
     except Exception as e:
         import traceback
         logger.exception(f"创建向量库[{collection_name}]异常:：%s", traceback.format_exc())
@@ -75,8 +75,6 @@ def del_collection():
         is_succ, msg = delete_collection(tenant_code, collection_name)
         if not is_succ:
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
-
-        SQLDatabase().delete_chat_effect_param(tenant_code, collection_name)
     except Exception:
         import traceback
         logger.exception(f"删除向量库[{collection_name}]异常: %s", traceback.format_exc())
@@ -169,7 +167,8 @@ def add_document():
     tenant_code = data.get('tenant_code', '')
     collection_name = data.get('collection_name', '')
     api_key = data.get('api_key', '')
-    doc_path = data.get('doc_path', '')
+    doc_url = data.get('doc_url', '')
+    doc_name = data.get('doc_name', '')
 
     if not check_api_key(api_key):
         return jsonify({'status': 'fail', 'code': 400, 'msg': 'api_key校验不通过', 'data': ''})
@@ -180,19 +179,30 @@ def add_document():
     if not collection_name:
         return jsonify({'status': 'fail', 'msg': '缺少知识库名称参数', 'code': 400, 'data': ''})
 
-    if not os.path.isfile(doc_path):
-        logger.error(f"{doc_path}文件不存在或者是一个目录")
-        return jsonify({'status': 'fail', 'msg': f"{doc_path}文件不存在或者不是一个文件", 'code': 400, 'data': ''})
+    if not doc_url:
+        return jsonify({'status': 'fail', 'msg': '缺少文档URL参数', 'code': 400, 'data': ''})
 
-    is_succ, content = extract_content_from_file(doc_path)
+    if not doc_name:
+        return jsonify({'status': 'fail', 'msg': '缺少文档名称参数', 'code': 400, 'data': ''})
+
+    # 验证URL格式
+    try:
+        parsed_url = urlparse(doc_url)
+        if not parsed_url.scheme or not parsed_url.netloc:
+            return jsonify({'status': 'fail', 'msg': '文档URL格式不正确', 'code': 400, 'data': ''})
+    except Exception as e:
+        return jsonify({'status': 'fail', 'msg': f'文档URL格式验证失败: {repr(e)}', 'code': 400, 'data': ''})
+
+    # 从配置读取OCR配置
+    ocr_config = config.get('ocr_service', {})
+    is_succ, content = extract_content_from_file(doc_url, ocr_config=ocr_config)
     if not is_succ:
-        logger.error(f'f"解析文件失败:{content}"')
-        return jsonify({'status': 'fail', 'msg': f"解析文件失败:{content}", 'code': 400, 'data': ''})
+        logger.error(f"解析文档失败:{content}")
+        return jsonify({'status': 'fail', 'msg': f"解析文档失败:{content}", 'code': 400, 'data': ''})
 
     try:
-        doc_name = doc_path.split('/')[-1]
         is_succ, msg = insert_docs_to_collection(tenant_code, collection_name, doc_name_list=[doc_name.strip()],
-                                                 doc_content_list=[content], source_list=[doc_path], metadata_list=[{}])
+                                                 doc_content_list=[content], source_list=[doc_url], metadata_list=[{}])
         if not is_succ:
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
     except Exception:
@@ -209,7 +219,8 @@ def add_multi_document():
     tenant_code = data.get('tenant_code', '')
     collection_name = data.get('collection_name', '')
     api_key = data.get('api_key', '')
-    multi_doc_path = data.get('multi_doc_path', '')
+    multi_doc_urls = data.get('multi_doc_urls', [])
+    doc_names = data.get('doc_names', [])
 
     if not check_api_key(api_key):
         return jsonify({'status': 'fail', 'code': 400, 'msg': 'api_key校验不通过', 'data': ''})
@@ -220,39 +231,68 @@ def add_multi_document():
     if not collection_name:
         return jsonify({'status': 'fail', 'msg': '缺少知识库名称参数', 'code': 400, 'data': ''})
 
-    if not os.path.exists(multi_doc_path):
-        logger.error(f"{multi_doc_path}目录不存在")
-        return jsonify({'status': 'fail', 'msg': f"{multi_doc_path}目录不存在", 'code': 400, 'data': ''})
+    if not multi_doc_urls or not isinstance(multi_doc_urls, list):
+        return jsonify({'status': 'fail', 'msg': '缺少文档URL列表参数或格式不正确', 'code': 400, 'data': ''})
 
-    files_and_dirs = os.listdir(multi_doc_path)
-    files = [os.path.join(multi_doc_path, f) for f in files_and_dirs if os.path.isfile(os.path.join(multi_doc_path, f))]
+    if len(multi_doc_urls) == 0:
+        return jsonify({'status': 'fail', 'msg': '文档URL列表为空', 'code': 400, 'data': ''})
 
+    if not doc_names or not isinstance(doc_names, list):
+        return jsonify({'status': 'fail', 'msg': '缺少文档名称列表参数或格式不正确', 'code': 400, 'data': ''})
+
+    if len(doc_names) != len(multi_doc_urls):
+        return jsonify({'status': 'fail', 'msg': f'文档名称列表长度({len(doc_names)})与文档URL列表长度({len(multi_doc_urls)})不一致', 'code': 400, 'data': ''})
+
+    # 从配置读取OCR配置
+    ocr_config = config.get('ocr_service', {})
+    
     success_count = 0
     failed_count = 0
-    for doc in files:
+    for idx, doc_url in enumerate(multi_doc_urls):
         try:
-            is_succ, content = extract_content_from_file(doc)
-            if not is_succ:
-                logger.error(f'f"解析文件[{doc}]失败:{content}"')
+            # 验证URL格式
+            try:
+                parsed_url = urlparse(doc_url)
+                if not parsed_url.scheme or not parsed_url.netloc:
+                    logger.error(f"文档URL格式不正确: {doc_url}")
+                    failed_count += 1
+                    continue
+            except Exception as e:
+                logger.error(f"文档URL格式验证失败: {doc_url}, 错误: {repr(e)}")
                 failed_count += 1
                 continue
-            doc_name = doc.split('/')[-1]
+            
+            is_succ, content = extract_content_from_file(doc_url, ocr_config=ocr_config)
+            if not is_succ:
+                logger.error(f"解析文档[{doc_url}]失败:{content}")
+                failed_count += 1
+                continue
+            
+            # 从请求参数中获取文档名称
+            doc_name = doc_names[idx].strip() if idx < len(doc_names) else ''
+            if not doc_name:
+                logger.error(f"文档名称为空，索引: {idx}")
+                failed_count += 1
+                continue
+            
             is_succ, msg = insert_docs_to_collection(tenant_code, collection_name, doc_name_list=[doc_name],
-                                                     doc_content_list=[content], source_list=[doc_path],
+                                                     doc_content_list=[content], source_list=[doc_url],
                                                      metadata_list=[{}])
             if not is_succ:
-                logger.error(f'f"插入文档[{doc}]到向量库[{collection_name}]失败:{msg}"')
+                logger.error(f"插入文档[{doc_url}]到向量库[{collection_name}]失败:{msg}")
                 failed_count += 1
                 continue
             success_count += 1
         except Exception:
             import traceback
-            logger.exception(f"插入文档[{doc}]到向量库[{collection_name}]异常: %s", traceback.format_exc())
-            return jsonify({'status': 'fail', 'msg': traceback.format_exc(), 'code': 400})
+            logger.exception(f"插入文档[{doc_url}]到向量库[{collection_name}]异常: %s", traceback.format_exc())
+            failed_count += 1
+            continue
+    
     if failed_count > 0:
         return jsonify({'status': 'fail', 'code': 400,
                         'msg': f'插入文档到向量库[{collection_name}]：成功[{success_count}]个,失败[{failed_count}]个', 'data': ''})
-    return jsonify({'status': 'success', 'code': 200, 'msg': '插入文档到向量库[{collection_name}]成功', 'data': ''})
+    return jsonify({'status': 'success', 'code': 200, 'msg': f'插入文档到向量库[{collection_name}]成功', 'data': ''})
 
 
 @app.route('/vector_db_service/update_qa', methods=['POST'])

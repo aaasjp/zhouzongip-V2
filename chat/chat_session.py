@@ -173,16 +173,6 @@ if __name__ == '__main__':
         print("true")
     '''
 
-    # 下面是测试对话效果参数的数据库操作
-    '''
-    tenant_code = 'xiaomi'
-    collection_name = 'caiwu'
-    params = config['chat_effect_param']
-    SQLDatabase().upsert_chat_effect_param(tenant_code=tenant_code, collection_name=collection_name, params=params)
-    params = SQLDatabase().get_chat_effect_param(tenant_code=tenant_code, collection_name=collection_name)
-    print(params)
-    SQLDatabase().delete_chat_effect_param(tenant_code, collection_name)
-    '''
 
     # 下面是测试对话数据的数据库操作
     csm = ChatSessionManager()
