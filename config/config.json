@@ -22,7 +22,7 @@
   },
   "milvus_api_server": {
     "host": "127.0.0.1",
-    "port": 8801
+    "port": 8005
   },
   "name_convention": {
     "database_prefix": "MilvusDB_",
