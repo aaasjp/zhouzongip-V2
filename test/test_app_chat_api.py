@@ -1,7 +1,7 @@
 import requests
 import json
 
-base_url = 'http://127.0.0.1:8802/'
+base_url = 'http://172.17.10.144:8802/'
 api_key = '2024_hello_ai'
 session_id='20232013123123-10000002'
 

@@ -14,7 +14,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 配置信息
-BASE_URL = 'http://127.0.0.1:8004/vector_db_service/'
+BASE_URL = 'http://172.17.10.144:8005/vector_db_service/'
 API_KEY = '2024_hello_ai'
 TENANT_CODE = 'resume'
 COLLECTION_NAME = 'test_collection'
@@ -62,7 +62,7 @@ def post_request(url, data, show_request=True):
         return None
     except requests.exceptions.ConnectionError as errc:
         print(f"连接错误: {errc}")
-        print("请确保向量数据库服务已启动（默认端口8004）")
+        print("请确保向量数据库服务已启动（默认端口8005）")
         return None
     except requests.exceptions.Timeout as errt:
         print(f"超时错误: {errt}")

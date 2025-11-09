@@ -17,12 +17,12 @@
     }
   },
   "milvus": {
-    "host": "127.0.0.1",
+    "host": "172.17.10.144",
     "port": 19530
   },
   "milvus_api_server": {
-    "host": "127.0.0.1",
-    "port": 8004
+    "host": "0.0.0.0",
+    "port": 8005
   },
   "name_convention": {
     "database_prefix": "MilvusDB_",
@@ -78,7 +78,7 @@
     }
   },
   "ocr_service": {
-    "base_url": "http://127.0.0.1:8000",
+    "base_url": "http://172.17.10.144.1:8000",
     "parse_mode": "accuracy",
     "timeout": 3000
   }

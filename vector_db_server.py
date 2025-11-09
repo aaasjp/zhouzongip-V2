@@ -442,4 +442,7 @@ def search_from_vector_db():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8004)
+    server_config = config.get('milvus_api_server', {})
+    host = server_config.get('host', '0.0.0.0')
+    port = server_config.get('port', 8005)
+    app.run(host=host, port=port)
