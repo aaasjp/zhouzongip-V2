@@ -16,8 +16,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 配置信息
 BASE_URL = 'http://172.17.10.144:8005/vector_db_service/'
 API_KEY = '2024_hello_ai'
-TENANT_CODE = 'resume'
-COLLECTION_NAME = 'test_collection'
+TENANT_CODE = 'ningbo_bank'
+COLLECTION_NAME = 'xzb'
 
 
 def print_separator(title=""):
@@ -177,8 +177,8 @@ def test_add_document():
         'tenant_code': TENANT_CODE,
         'collection_name': COLLECTION_NAME,
         'api_key': API_KEY,
-        'doc_url': 'http://220.154.134.61:9000/forum-files/2025-11-09-resume-28372e60-d92b-40c2-a050-8256e758ac8e.pdf',  # 请替换为实际URL
-        'doc_name': '测试文档-简历'
+        'doc_url': 'http://220.154.134.61:9000/upload/1/image/20251110174250_5cd9162bf0c741f0b1f4d7d6a872e5c8.png',
+        'doc_name': '屏幕截图(1).png'
     }
     
     print("注意: 此测试需要有效的文档URL，如果URL不可访问将失败")
@@ -197,10 +197,10 @@ def test_add_multi_document():
         'collection_name': COLLECTION_NAME,
         'api_key': API_KEY,
         'multi_doc_urls': [
-            'http://220.154.134.61:9000/forum-files/2025-11-09-resume-28372e60-d92b-40c2-a050-8256e758ac8e.pdf',  # 请替换为实际URL
+            'http://220.154.134.61:9000/upload/1/image/20251110174250_5cd9162bf0c741f0b1f4d7d6a872e5c8.png',
         ],
         'doc_names': [
-            '测试文档-简历'
+            '屏幕截图(1).png'
         ]
     }
     
@@ -261,7 +261,7 @@ def test_del_document():
         'tenant_code': TENANT_CODE,
         'collection_name': COLLECTION_NAME,
         'api_key': API_KEY,
-        'doc_name': ['测试文档']  # 支持批量删除
+        'doc_name': ['屏幕截图(1).png']  # 支持批量删除
     }
     result = post_request(api_url, data)
     return result
