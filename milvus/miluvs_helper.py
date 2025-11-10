@@ -3,10 +3,10 @@ import json
 from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 import torch
-#from config.log_config_vector_db import setup_logging
+from config.log_config_vector_db import setup_logging
 
 import logging
-#setup_logging()
+setup_logging()
 logger = logging.getLogger(__name__)
 
 DOC_FROM_QA_SOURCE = 'CONVERT_FROM_QA'
@@ -57,7 +57,7 @@ def doc_collection_schema():
 
 ##此方法需要调用者保持tenant_code是唯一的，否则会覆盖掉其他租户的知识库
 def create_collection(tenant_code, collection_name):
-    print("调用方法:create_collection，参数为:tenant_code=%s, collection_name=%s", tenant_code, collection_name)
+    logger.info(f"调用方法:create_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}")
 
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
@@ -67,8 +67,7 @@ def create_collection(tenant_code, collection_name):
     collection_qa_name = config_name_convention_dic['collection_qa_prefix'] + str(collection_name)
     collection_doc_name = config_name_convention_dic['collection_doc_prefix'] + str(collection_name)
 
-    print(
-        f"db_name={db_name}, collection_qa_name={collection_qa_name}, collection_doc_name={collection_doc_name}")
+    logger.debug(f"db_name={db_name}, collection_qa_name={collection_qa_name}, collection_doc_name={collection_doc_name}")
 
     connections.connect(host=config_milvus_dic['host'], port=config_milvus_dic['port'])
     ##如果db不存在就创建
@@ -88,19 +87,19 @@ def create_collection(tenant_code, collection_name):
     collection = Collection(collection_qa_name, schema=qa_collection_schema())
     collection.create_index(field_name="embedding", index_params=index_params)
     collection.load()
-    print(f"向量库[{collection_qa_name}]创建成功")
+    logger.info(f"向量库[{collection_qa_name}]创建成功")
 
     collection = Collection(collection_doc_name, schema=doc_collection_schema())
     collection.create_index(field_name="embedding", index_params=index_params)
     collection.load()
-    print(f"向量库[{collection_doc_name}]创建成功")
+    logger.info(f"向量库[{collection_doc_name}]创建成功")
 
-    print(f"向量库[{collection_name}]下的问答库和文档库创建成功")
+    logger.info(f"向量库[{collection_name}]下的问答库和文档库创建成功")
     return True, f"向量库[{collection_name}]下的问答库和文档库创建成功"
 
 
 def delete_collection(tenant_code, collection_name):
-    print("调用方法:delete_collection，参数为:tenant_code=%s, collection_name=%s", tenant_code, collection_name)
+    logger.info(f"调用方法:delete_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}")
 
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
@@ -119,18 +118,18 @@ def delete_collection(tenant_code, collection_name):
 
     if collection_qa_name in exist_collection_list:
         utility.drop_collection(collection_qa_name)
-        print(f"向量库[{collection_qa_name}]删除成功")
+        logger.info(f"向量库[{collection_qa_name}]删除成功")
 
     if collection_doc_name in exist_collection_list:
         utility.drop_collection(collection_doc_name)
-        print(f"向量库[{collection_doc_name}]删除成功")
+        logger.info(f"向量库[{collection_doc_name}]删除成功")
 
-    print(f"向量库[{collection_name}]下的问答库和文档库删除成功")
+    logger.info(f"向量库[{collection_name}]下的问答库和文档库删除成功")
     return True, f"向量库[{collection_name}]下的问答库和文档库删除成功"
 
 
 def insert_qa_to_collection(tenant_code, collection_name, question_list, answer_list, source_list, metadata_list):
-    print("调用方法:insert_qa_to_collection，参数为:tenant_code=%s, collection_name=%s", tenant_code, collection_name)
+    logger.info(f"调用方法:insert_qa_to_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, 问答对数量={len(question_list)}")
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
 
@@ -164,7 +163,7 @@ def insert_qa_to_collection(tenant_code, collection_name, question_list, answer_
         if len(res) > 0:
             exist_quest_count += 1
             to_delete_indices.append(i)
-            print(f'新增问答对：问题=[{q}] 已经存在，不进行插入')
+            logger.debug(f'新增问答对：问题=[{q}] 已经存在，不进行插入')
 
     question_list_to_insert = [x for i, x in enumerate(question_list) if i not in to_delete_indices]
     answer_list_to_insert = [x for i, x in enumerate(answer_list) if i not in to_delete_indices]
@@ -172,7 +171,7 @@ def insert_qa_to_collection(tenant_code, collection_name, question_list, answer_
     metadata_list_to_insert = [x for i, x in enumerate(metadata_list) if i not in to_delete_indices]
 
     if len(question_list_to_insert) == 0:
-        print(f"新增问答对0条，已经存在而无需新增的问答对{exist_quest_count}条")
+        logger.info(f"新增问答对0条，已经存在而无需新增的问答对{exist_quest_count}条")
         return True, f"新增问答对0条，已经存在而无需新增的问答对{exist_quest_count}条"
 
     question_embeddings = embedding_model.embed_documents(question_list_to_insert)
@@ -180,10 +179,10 @@ def insert_qa_to_collection(tenant_code, collection_name, question_list, answer_
             metadata_list_to_insert]
     collection.insert(data=data)
     collection.flush()
-    print(f'插入向量库[{collection_name}]成功，新增问答对{len(question_list)}条，已经存在而无需新增的问答对{exist_quest_count}条')
+    logger.info(f'插入向量库[{collection_name}]成功，新增问答对{len(question_list_to_insert)}条，已经存在而无需新增的问答对{exist_quest_count}条')
 
     if config['convert_qa_to_doc'] == 'yes':
-        print('convert_qa_to_doc==yes')
+        logger.debug('convert_qa_to_doc==yes，开始将问答对转换为文档')
         doc_name_list = []
         doc_content_list = []
         doc_source_list = []
@@ -201,7 +200,7 @@ def insert_qa_to_collection(tenant_code, collection_name, question_list, answer_
 
 
 def upsert_qa_to_collection(tenant_code, collection_name, question_list, answer_list, source_list, metadata_list):
-    print("调用方法:upsert_qa_to_collection，参数为:tenant_code=%s, collection_name=%s", tenant_code, collection_name)
+    logger.info(f"调用方法:upsert_qa_to_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, 问答对数量={len(question_list)}")
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
 
@@ -236,13 +235,13 @@ def upsert_qa_to_collection(tenant_code, collection_name, question_list, answer_
         logger.error(f"更新问答对：删除之后插入问答对出错:{msg}")
         return False, f"更新问答对：删除之后插入问答对出错:{msg}"
 
-    print(f'更新问答对向量库[{collection_name}]成功')
+    logger.info(f'更新问答对向量库[{collection_name}]成功')
     return True, f'更新问答对向量库[{collection_name}]成功'
 
 
 def insert_docs_to_collection(tenant_code, collection_name, doc_name_list, doc_content_list, source_list,
                               metadata_list):
-    print(f"调用方法:insert_doc_to_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}")
+    logger.info(f"调用方法:insert_doc_to_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, 文档数量={len(doc_name_list)}")
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
 
@@ -269,7 +268,7 @@ def insert_docs_to_collection(tenant_code, collection_name, doc_name_list, doc_c
         if len(res) > 0:
             exist_doc_count += 1
             to_delete_indices.append(i)
-            print(f'新增文档：file_name=[{dname}] 已经存在，不进行插入')
+            logger.debug(f'新增文档：file_name=[{dname}] 已经存在，不进行插入')
 
     doc_name_list = [x for i, x in enumerate(doc_name_list) if i not in to_delete_indices]
     doc_content_list = [x for i, x in enumerate(doc_content_list) if i not in to_delete_indices]
@@ -277,7 +276,7 @@ def insert_docs_to_collection(tenant_code, collection_name, doc_name_list, doc_c
     metadata_list = [x for i, x in enumerate(metadata_list) if i not in to_delete_indices]
 
     if len(doc_name_list) == 0:
-        print(f'新增文档0条，已经存在而无需新增的文档{exist_doc_count}条')
+        logger.info(f'新增文档0条，已经存在而无需新增的文档{exist_doc_count}条')
         return True, f'新增文档0条，已经存在而无需新增的文档{exist_doc_count}条'
 
     new_doc_name_list = []
@@ -309,20 +308,18 @@ def insert_docs_to_collection(tenant_code, collection_name, doc_name_list, doc_c
             new_metadata_list.append(metadata)
 
     block_embeddings = embedding_model.embed_documents(new_doc_content_block_list)
+    logger.debug(f"文档分块完成，共{len(new_doc_content_block_list)}个块，开始生成向量嵌入")
     data = [new_doc_name_list, new_doc_block_id_list, new_doc_content_block_list, new_source_list, block_embeddings,
             new_metadata_list]
     collection.insert(data=data)
     collection.flush()
-    print(f"插入docs到向量库[{collection_doc_name}]成功,新增文档{len(doc_name_list)}条，已经存在而无需新增的文档{exist_doc_count}条")
+    logger.info(f"插入docs到向量库[{collection_doc_name}]成功,新增文档{len(doc_name_list)}条，已经存在而无需新增的文档{exist_doc_count}条，共插入{len(new_doc_content_block_list)}个文档块")
     return True, f"插入docs到向量库[{collection_doc_name}]成功,新增文档{len(doc_name_list)}条，已经存在而无需新增的文档{exist_doc_count}条"
 
 
 def delete_qa_from_collection(tenant_code, collection_name, question_list):
-    print(f"调用方法:delete_qa_from_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}")
-    print(f'to be deleted question_list:\n')
-    for q in question_list:
-        print(q)
-    print('\n')
+    logger.info(f"调用方法:delete_qa_from_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, 待删除问题数量={len(question_list)}")
+    logger.debug(f'待删除的问题列表: {question_list}')
 
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
@@ -352,25 +349,22 @@ def delete_qa_from_collection(tenant_code, collection_name, question_list):
         collection.delete(f"question == '{escaped_question}'")
     collection.flush()
 
-    print(f"从向量库[{collection_qa_name}]删除问答对成功")
+    logger.info(f"从向量库[{collection_qa_name}]删除问答对成功，共删除{len(question_list)}条")
 
     if config['convert_qa_to_doc'] == 'yes':
-        print('convert_qa_to_doc==yes')
+        logger.debug('convert_qa_to_doc==yes，开始删除对应的文档')
         is_succ, msg = delete_docs_from_collection(tenant_code, collection_name, doc_name_list=question_list)
         if not is_succ:
+            logger.error(f"删除问答对对应的文档失败: {msg}")
             return False, msg
 
-    print(f"从向量库[{collection_doc_name}]删除问答对成功")
+    logger.info(f"从向量库[{collection_name}]删除问答对成功")
     return True, f"从向量库[{collection_name}]删除问答对成功"
 
 
 def delete_docs_from_collection(tenant_code, collection_name, doc_name_list):
-    print(f"调用方法:delete_docs_from_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}")
-
-    print(f'to be deleted doc_name_list:\n')
-    for d in doc_name_list:
-        print(d)
-    print('\n')
+    logger.info(f"调用方法:delete_docs_from_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, 待删除文档数量={len(doc_name_list)}")
+    logger.debug(f'待删除的文档列表: {doc_name_list}')
 
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
@@ -394,12 +388,13 @@ def delete_docs_from_collection(tenant_code, collection_name, doc_name_list):
         collection.delete(f"file_name == '{file_name}'")
     collection.flush()
 
-    print(f"从向量库[{collection_doc_name}]删除文档成功")
+    logger.info(f"从向量库[{collection_doc_name}]删除文档成功，共删除{len(doc_name_list)}个文档")
     return True, f"从向量库[{collection_doc_name}]删除文档成功"
 
 
 def search_from_collection(tenant_code, collection_name, collection_type, query_list, filter_expr, limit=5):
-    print(f"调用方法:search_from_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, collection_type={collection_type}, query={query_list}")
+    logger.info(f"调用方法:search_from_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, collection_type={collection_type}, 查询数量={len(query_list)}, limit={limit}")
+    logger.debug(f"查询内容: {query_list}, 过滤条件: {filter_expr}")
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
 
@@ -430,7 +425,9 @@ def search_from_collection(tenant_code, collection_name, collection_type, query_
         collection = Collection(collection_doc_name)
 
     fields = [f.name for f in collection.schema.fields if f.name != 'embedding']
+    logger.debug(f"开始生成查询向量嵌入，查询数量={len(query_list)}")
     query_embeddings = embedding_model.embed_documents(query_list)
+    logger.debug(f"查询向量嵌入生成完成，开始搜索")
 
 
     res = collection.search(
@@ -464,6 +461,6 @@ def search_from_collection(tenant_code, collection_name, collection_type, query_
         "distances":distances,
         "entities":entities
     }
-    print(f'====>res={json.dumps(ret_dic,ensure_ascii=False,indent=2)}',flush=True)
-    print(f'====>res={json.dumps(ret_dic,ensure_ascii=False,indent=2)}')
+    logger.debug(f'搜索结果: {json.dumps(ret_dic,ensure_ascii=False,indent=2)}')
+    logger.info(f'从向量库[{collection_name}]搜索完成，返回{len(ids)}个查询结果')
     return ret_dic
