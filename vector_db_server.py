@@ -102,22 +102,62 @@ def add_qa():
     if not collection_name:
         return jsonify({'status': 'fail', 'msg': '缺少知识库名称参数', 'code': 400, 'data': ''})
 
-    if not question:
-        return jsonify({'status': 'fail', 'msg': '缺少问题参数', 'code': 400, 'data': ''})
+    # 支持question和answer可以是字符串或列表
+    # 如果是字符串，转换为列表（保持向后兼容）
+    if isinstance(question, str):
+        if not question.strip():
+            return jsonify({'status': 'fail', 'msg': '缺少问题参数', 'code': 400, 'data': ''})
+        question_list = [question.strip()]
+    elif isinstance(question, list):
+        if len(question) == 0:
+            return jsonify({'status': 'fail', 'msg': '问题列表不能为空', 'code': 400, 'data': ''})
+        question_list = [q.strip() if isinstance(q, str) else str(q).strip() for q in question]
+        # 检查转换后是否有空问题
+        if any(not q for q in question_list):
+            return jsonify({'status': 'fail', 'msg': '问题列表中包含空问题', 'code': 400, 'data': ''})
+    else:
+        return jsonify({'status': 'fail', 'msg': '问题参数格式不正确，应为字符串或列表', 'code': 400, 'data': ''})
 
-    if not answer:
-        return jsonify({'status': 'fail', 'msg': '缺少答案参数', 'code': 400, 'data': ''})
+    if isinstance(answer, str):
+        if not answer:
+            return jsonify({'status': 'fail', 'msg': '缺少答案参数', 'code': 400, 'data': ''})
+        answer_list = [answer]
+    elif isinstance(answer, list):
+        if len(answer) == 0:
+            return jsonify({'status': 'fail', 'msg': '答案列表不能为空', 'code': 400, 'data': ''})
+        answer_list = [a if isinstance(a, str) else str(a) for a in answer]
+        # 检查转换后是否有空答案
+        if any(not a for a in answer_list):
+            return jsonify({'status': 'fail', 'msg': '答案列表中包含空答案', 'code': 400, 'data': ''})
+    else:
+        return jsonify({'status': 'fail', 'msg': '答案参数格式不正确，应为字符串或列表', 'code': 400, 'data': ''})
+
+    # 验证question和answer列表长度是否一致
+    if len(question_list) != len(answer_list):
+        return jsonify({'status': 'fail', 'msg': f'问题列表长度({len(question_list)})与答案列表长度({len(answer_list)})不一致', 'code': 400, 'data': ''})
+
+    # 处理source参数：如果是列表，长度需匹配；如果是字符串，重复使用
+    if isinstance(source, list):
+        if len(source) != len(question_list):
+            return jsonify({'status': 'fail', 'msg': f'来源列表长度({len(source)})与问题列表长度({len(question_list)})不一致', 'code': 400, 'data': ''})
+        source_list = source
+    else:
+        # 字符串或空值，重复使用
+        source_list = [source] * len(question_list)
+
+    # 生成metadata_list
+    metadata_list = [{}] * len(question_list)
 
     try:
-        is_succ, msg = insert_qa_to_collection(tenant_code, collection_name, question_list=[question.strip()],
-                                               answer_list=[answer], source_list=[source], metadata_list=[{}])
+        is_succ, msg = insert_qa_to_collection(tenant_code, collection_name, question_list=question_list,
+                                               answer_list=answer_list, source_list=source_list, metadata_list=metadata_list)
         if not is_succ:
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
     except Exception:
         import traceback
         logger.exception(f"插入向量库[{collection_name}]异常: %s", traceback.format_exc())
         return jsonify({'status': 'fail', 'msg': traceback.format_exc(), 'code': 400})
-    return jsonify({'status': 'success', 'code': 200, 'msg': '成功插入问答对到向量库', 'data': ''})
+    return jsonify({'status': 'success', 'code': 200, 'msg': f'成功插入{len(question_list)}条问答对到向量库', 'data': ''})
 
 
 @app.route('/vector_db_service/add_qa_from_template', methods=['POST'])
