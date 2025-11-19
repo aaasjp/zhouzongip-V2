@@ -1,7 +1,7 @@
 {
   "llm": {
     "model": "Qwen2.5-72B-Instruct",
-    "base_url": "http://<模型地址>",
+    "base_url": "http://10.249.238.110:8009/v1",
     "api_key": "EMPTY"
   },
   "milvus": {
@@ -15,24 +15,26 @@
   "name_convention": {
     "database_prefix": "MilvusDB_",
     "collection_qa_prefix": "Collection_QA_",
-    "collection_doc_prefix": "Collection_DOC_"
+    "collection_doc_prefix": "Collection_DOC_",
+    "global_database": "MilvusDB_Global",
+    "global_collection_qa": "Collection_QA_Global",
+    "global_collection_doc": "Collection_DOC_Global"
   },
   "index_params": {
-    "metric_type": "L2",
+    "metric_type": "COSINE",
     "index_type": "FLAT",
     "params": {
       "nlist": 128
     }
   },
   "search_params": {
-    "metric_type": "L2",
+    "metric_type": "COSINE",
     "params": {
       "nprobe": 128
     }
   },
   "api_key": "2024_hello_ai",
   "embedding_model_path": "/workspace/embeddings/bge-large-zh-v1.5",
-  "convert_qa_to_doc": "yes",
   "SERPAPI_API_KEY": "ae43b25aa260867c95768b1a5d5acc50ce658b77bb561b77d39410580a9707d1",
   "split": {
     "chunk_size": 1000,
@@ -53,15 +55,15 @@
     },
     "llm_generate": {
       "top_p": 0.5,
-      "temperature": 0.5,
-      "max_tokens": 2048,
-      "frequency_penalty": 1.2,
-      "system_prompt": "你是一个人工智能客服助手，名字叫良师益友，是由良师益友团队训练和开发的大预言模型。"
+      "temperature": 0.01,
+      "max_tokens": 8192,
+      "repetition_penalty": 1.05,
+      "system_prompt": "你是宁波银行的AI小助手。"
     },
     "knowledge": {
-      "qa_hit_score": 0.2,
-      "qa_similar_score": 0.7,
-      "doc_hit_score": 2,
+      "qa_hit_score": 0.75,
+      "qa_similar_score": 0.6,
+      "doc_hit_score": 0.65,
       "rag_doc_counts": 3
     }
   },

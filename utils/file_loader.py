@@ -132,7 +132,7 @@ def load_pdf(file_path: str):
                 contents.append(new_text)
     except Exception as e:
         import traceback
-        print(traceback.format_exc(), flush=True)
+        logger.error(traceback.format_exc())
     return '\n'.join(contents)
 
 

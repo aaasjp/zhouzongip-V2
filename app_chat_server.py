@@ -44,7 +44,7 @@ def generate_session_id():
 def handle_connect():
     session_id = request.sid
     #send(f'====>客户端已经链接。session_id={session_id},room={session_id}')
-    print(f'====>客户端已经链接。session_id={session_id},room={session_id}', flush=True)
+    logger.info(f'客户端已连接, session_id={session_id}, room={session_id}')
     chat_session_manager.add_session(session_id)
     emit('session_id', {'session_id': session_id, "room": session_id})
 
@@ -53,10 +53,10 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     session_id = request.sid
-    print(f'===>>remove_session:{session_id}', flush=True)
+    logger.info(f'移除session: {session_id}')
     chat_session_manager.remove_session(session_id)
     #send(f'====>客户端链接已断开.session_id={session_id}')
-    print(f'====>客户端链接已断开.session_id={session_id}', flush=True)
+    logger.info(f'客户端连接已断开, session_id={session_id}')
 
 
 @socketio.on('join')
@@ -64,14 +64,14 @@ def handle_join(data):
     session_id = request.sid
     room = data.get('room', None)
     user_id = data.get('user_id', None)
-    print(f'===>>join room: session_id={session_id},room={room}, user_id={user_id}', flush=True)
+    logger.info(f'加入房间: session_id={session_id}, room={room}, user_id={user_id}')
 
     if not room:
         logger.error('room must required!')
         raise ValueError('room must required!')
     join_room(room)
     #send(f'{user_id} has entered the room = {room}.', to=room)
-    print(f'{user_id} has entered the room = {room}.',flush=True)
+    logger.info(f'{user_id} 已进入房间 {room}')
 
 
 
@@ -85,12 +85,12 @@ def handle_leave(data):
         raise ValueError('room must required!')
     leave_room(room)
     #send(f'===>>leave room: session_id={session_id},room={room}, user_id={user_id}', to=room)
-    print(f'===>>leave room: session_id={session_id},room={room}, user_id={user_id}', flush=True)
+    logger.info(f'离开房间: session_id={session_id}, room={room}, user_id={user_id}')
 
 
 @socketio.on('chat')
 def handle_chat(data):
-    print(f'===>>begin to chat: {data}', flush=True)
+    logger.info(f'开始聊天: {data}')
     data["session_id"]=request.sid
     socketio.start_background_task(target=send_message(data))
 

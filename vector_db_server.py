@@ -29,7 +29,7 @@ def index():
 @app.route('/vector_db_service/new_collection', methods=['POST'])
 def new_collection():
     data = request.get_json()
-    print(f'====>new_collection(),data={data}',flush=True)
+    logger.info(f'创建collection, data={data}')
     tenant_code = data.get('tenant_code', '')
     collection_name = data.get('collection_name', '')
     api_key = data.get('api_key', '')
@@ -57,7 +57,7 @@ def new_collection():
 @app.route('/vector_db_service/del_collection', methods=['POST'])
 def del_collection():
     data = request.get_json()
-    print(f'====>del_collection(),data={data}',flush=True)
+    logger.info(f'删除collection, data={data}')
     tenant_code = data.get('tenant_code', '')
     collection_name = data.get('collection_name', '')
     api_key = data.get('api_key', '')
@@ -85,13 +85,18 @@ def del_collection():
 @app.route('/vector_db_service/add_qa', methods=['POST'])
 def add_qa():
     data = request.get_json()
-    print(f'====>add_qa(),data={data}',flush=True)
+    logger.info(f'添加QA, data={data}')
     tenant_code = data.get('tenant_code', '')
     collection_name = data.get('collection_name', '')
     api_key = data.get('api_key', '')
     question = data.get('question', '')
     answer = data.get('answer', '')
     source = data.get('source', '')
+    org_code = data.get('org_code', '')
+    
+    # collection_name实际上就是部门code(org_code)，如果org_code为空，则使用collection_name
+    if not org_code:
+        org_code = collection_name
 
     if not check_api_key(api_key):
         return jsonify({'status': 'fail', 'code': 400, 'msg': 'api_key校验不通过', 'data': ''})
@@ -150,7 +155,7 @@ def add_qa():
 
     try:
         is_succ, msg = insert_qa_to_collection(tenant_code, collection_name, question_list=question_list,
-                                               answer_list=answer_list, source_list=source_list, metadata_list=metadata_list)
+                                               answer_list=answer_list, source_list=source_list, metadata_list=metadata_list, org_code=org_code)
         if not is_succ:
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
     except Exception:
@@ -163,11 +168,16 @@ def add_qa():
 @app.route('/vector_db_service/add_qa_from_template', methods=['POST'])
 def add_qa_from_template():
     data = request.get_json()
-    print(f'====>add_qa_from_template(),data={data}',flush=True)
+    logger.info(f'从模板添加QA, data={data}')
     tenant_code = data.get('tenant_code', '')
     collection_name = data.get('collection_name', '')
     api_key = data.get('api_key', '')
     template_file_path = data.get('template_path', '')
+    org_code = data.get('org_code', '')
+    
+    # collection_name实际上就是部门code(org_code)，如果org_code为空，则使用collection_name
+    if not org_code:
+        org_code = collection_name
 
     if not check_api_key(api_key):
         return jsonify({'status': 'fail', 'code': 400, 'msg': 'api_key校验不通过', 'data': ''})
@@ -190,7 +200,7 @@ def add_qa_from_template():
     try:
         is_succ, msg = insert_qa_to_collection(tenant_code, collection_name, question_list=question_list,
                                                answer_list=answers_list, source_list=source_list,
-                                               metadata_list=metadata_list)
+                                               metadata_list=metadata_list, org_code=org_code)
         if not is_succ:
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
     except Exception:
@@ -203,12 +213,17 @@ def add_qa_from_template():
 @app.route('/vector_db_service/add_document', methods=['POST'])
 def add_document():
     data = request.get_json()
-    print(f'====>add_document(),data={data}',flush=True)
+    logger.info(f'添加文档, data={data}')
     tenant_code = data.get('tenant_code', '')
     collection_name = data.get('collection_name', '')
     api_key = data.get('api_key', '')
     doc_url = data.get('doc_url', '')
     doc_name = data.get('doc_name', '')
+    org_code = data.get('org_code', '')
+    
+    # collection_name实际上就是部门code(org_code)，如果org_code为空，则使用collection_name
+    if not org_code:
+        org_code = collection_name
 
     if not check_api_key(api_key):
         return jsonify({'status': 'fail', 'code': 400, 'msg': 'api_key校验不通过', 'data': ''})
@@ -242,7 +257,7 @@ def add_document():
 
     try:
         is_succ, msg = insert_docs_to_collection(tenant_code, collection_name, doc_name_list=[doc_name.strip()],
-                                                 doc_content_list=[content], source_list=[doc_url], metadata_list=[{}])
+                                                 doc_content_list=[content], source_list=[doc_url], metadata_list=[{}], org_code=org_code)
         if not is_succ:
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
     except Exception:
@@ -255,12 +270,17 @@ def add_document():
 @app.route('/vector_db_service/add_multi_document', methods=['POST'])
 def add_multi_document():
     data = request.get_json()
-    print(f'====>add_multi_document(),data={data}')
+    logger.info(f'批量添加文档, data={data}')
     tenant_code = data.get('tenant_code', '')
     collection_name = data.get('collection_name', '')
     api_key = data.get('api_key', '')
     multi_doc_urls = data.get('multi_doc_urls', [])
     doc_names = data.get('doc_names', [])
+    org_code = data.get('org_code', '')
+    
+    # collection_name实际上就是部门code(org_code)，如果org_code为空，则使用collection_name
+    if not org_code:
+        org_code = collection_name
 
     if not check_api_key(api_key):
         return jsonify({'status': 'fail', 'code': 400, 'msg': 'api_key校验不通过', 'data': ''})
@@ -317,7 +337,7 @@ def add_multi_document():
             
             is_succ, msg = insert_docs_to_collection(tenant_code, collection_name, doc_name_list=[doc_name],
                                                      doc_content_list=[content], source_list=[doc_url],
-                                                     metadata_list=[{}])
+                                                     metadata_list=[{}], org_code=org_code)
             if not is_succ:
                 logger.error(f"插入文档[{doc_url}]到向量库[{collection_name}]失败:{msg}")
                 failed_count += 1
@@ -338,13 +358,18 @@ def add_multi_document():
 @app.route('/vector_db_service/update_qa', methods=['POST'])
 def update_qa():
     data = request.get_json()
-    print(f'====>update_qa(),data={data}')
+    logger.info(f'更新QA, data={data}')
     tenant_code = data.get('tenant_code', '')
     collection_name = data.get('collection_name', '')
     api_key = data.get('api_key', '')
     question = data.get('question', '')
     answer = data.get('answer', '')
     source = data.get('source', '')
+    org_code = data.get('org_code', '')
+    
+    # collection_name实际上就是部门code(org_code)，如果org_code为空，则使用collection_name
+    if not org_code:
+        org_code = collection_name
 
     if not check_api_key(api_key):
         return jsonify({'status': 'fail', 'code': 400, 'msg': 'api_key校验不通过', 'data': ''})
@@ -363,7 +388,7 @@ def update_qa():
 
     try:
         is_succ, msg = upsert_qa_to_collection(tenant_code, collection_name, question_list=[question],
-                                               answer_list=[answer], source_list=[source], metadata_list=[{}])
+                                               answer_list=[answer], source_list=[source], metadata_list=[{}], org_code=org_code)
         if not is_succ:
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
     except Exception:
@@ -376,7 +401,7 @@ def update_qa():
 @app.route('/vector_db_service/del_qa', methods=['POST'])
 def del_qa():
     data = request.get_json()
-    print(f'====>del_qa(),data={data}')
+    logger.info(f'删除QA, data={data}')
     tenant_code = data.get('tenant_code', '')
     collection_name = data.get('collection_name', '')
     api_key = data.get('api_key', '')
@@ -411,7 +436,7 @@ def del_qa():
 @app.route('/vector_db_service/del_document', methods=['POST'])
 def del_document():
     data = request.get_json()
-    print(f'====>del_document(),data={data}')
+    logger.info(f'删除文档, data={data}')
     tenant_code = data.get('tenant_code', '')
     collection_name = data.get('collection_name', '')
     api_key = data.get('api_key', '')
@@ -445,7 +470,7 @@ def del_document():
 @app.route('/vector_db_service/search_from_vector_db', methods=['POST'])
 def search_from_vector_db():
     data = request.get_json()
-    print(f'====>search_from_vector_db(),data={data}')
+    logger.info(f'从向量库搜索, data={data}')
     tenant_code = data.get('tenant_code', '')
     collection_name = data.get('collection_name', '')
     api_key = data.get('api_key', '')
@@ -473,7 +498,7 @@ def search_from_vector_db():
         res = search_from_collection(tenant_code=tenant_code, collection_name=collection_name,
                                      collection_type=collection_type, query_list=[query], filter_expr=filter_expr, limit=limit)
 
-        print(f"从向量库[{collection_name}]查询成功")
+        logger.info(f"从向量库[{collection_name}]查询成功")
     except Exception:
         import traceback
         logger.exception(f"从向量库[{collection_name}]查询异常: %s", traceback.format_exc())

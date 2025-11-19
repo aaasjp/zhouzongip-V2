@@ -49,8 +49,7 @@ def search_docs_block_from_vector_db(tenant_code, collection_name, query, filter
 
 
 def search_from_vector_db_api(tenant_code, collection_name, collection_type, query, filter_expr='', limit=5):
-    print(
-        f"request milvus server：tenant_code={tenant_code}, collection_name={collection_name}, collection_type={collection_type}, query={query}, filter_expr={filter_expr}, limit={limit}",flush=True)
+    logger.debug(f"请求milvus服务器: tenant_code={tenant_code}, collection_name={collection_name}, collection_type={collection_type}, query={query}, filter_expr={filter_expr}, limit={limit}")
 
     data = {
         'tenant_code': tenant_code,
@@ -85,10 +84,10 @@ if __name__ == "__main__":
 
 
     questions, answers, scores, sources = search_qa_from_vector_db(tenant_code, collection_name, query, limit=limit)
-    print(f'questions={questions}')
-    print(f'answers={answers}')
-    print(f'scores={scores}')
-    print(f'sources={sources}')
+    logger.debug(f'questions={questions}')
+    logger.debug(f'answers={answers}')
+    logger.debug(f'scores={scores}')
+    logger.debug(f'sources={sources}')
 
     query = '粤省心'
     doc_contents, doc_scores, doc_block_ids, doc_sources, doc_file_names = search_docs_block_from_vector_db(tenant_code,
@@ -96,10 +95,10 @@ if __name__ == "__main__":
                                                                                                             query,
                                                                                                             limit=limit)
 
-    print(f'doc_contents={doc_contents}')
-    print(f'doc_scores={doc_scores}')
-    print(f'doc_sources={doc_sources}')
-    print(f'doc_file_names={doc_file_names}')
+    logger.debug(f'doc_contents={doc_contents}')
+    logger.debug(f'doc_scores={doc_scores}')
+    logger.debug(f'doc_sources={doc_sources}')
+    logger.debug(f'doc_file_names={doc_file_names}')
 
 
 

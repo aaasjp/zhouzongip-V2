@@ -1,5 +1,8 @@
 from prompt.prompt_util import *
 from llm.llm_service import *
+import logging
+
+logger = logging.getLogger(__name__)
 
 def stream_string(string, ind=0):
     for i in range(ind, len(string)):
@@ -77,6 +80,6 @@ def extend_questions(origin_question:str,llm:LlmService)->list[str]:
             return response.strip().split('\n')
     except Exception as e:
         import traceback
-        print(f'====>generate extend questions error:{traceback.format_exc()}')
+        logger.error(f'生成扩展问题错误: {traceback.format_exc()}')
         return []
 

@@ -28,7 +28,7 @@ class ChatUitls:
             'reply_reference':[],
         }
 
-        print(f'=====>params_dic={json.dumps(params_dic, ensure_ascii=False, indent=2)}',flush=True)
+        logger.info(f'请求参数: {json.dumps(params_dic, ensure_ascii=False, indent=2)}')
 
         prompt = params_dic['prompt']
         history = params_dic['history']
@@ -68,13 +68,14 @@ class ChatUitls:
         context_intent = summary_context_intent(query=query, history=history, llm=self.llm_srv,
                                                 llm_generate_params=llm_generate_params)
 
-        print(f'=====>current query is:{query}, context_intent is:{context_intent}',flush=True)
+        logger.info(f'当前查询: {query}, 上下文意图: {context_intent}')
 
         questions, answers, scores, sources = search_qa_from_vector_db(tenant_code, collection_name, query, limit=5)
 
-        hit_indices = [i for i, s in enumerate(scores) if scores[i] <= qa_hit_score]
+        # COSINE: 越大越相似，所以使用 >= 判断
+        hit_indices = [i for i, s in enumerate(scores) if scores[i] >= qa_hit_score]
 
-        #recommend_questions = [q for i, q in enumerate(questions) if qa_hit_score < scores[i] <= qa_similar_score]
+        #recommend_questions = [q for i, q in enumerate(questions) if qa_similar_score < scores[i] <= qa_hit_score]
         recommend_questions=extend_questions(context_intent,llm=self.llm_srv)
         chat_stat = ChatState()
         chat_stat.round = cur_round
@@ -83,7 +84,7 @@ class ChatUitls:
         chat_stat.reply = ''
 
         if hit_indices:
-            print(f'=====>hit qa:query={query}, context_intent={context_intent}',flush=True)
+            logger.info(f'命中QA: query={query}, context_intent={context_intent}')
             reply_reference=[{'source':'','content':answers[0]}]
             chat_stat.reply_type = 'KNOWLEDGE_QA'
             chat_stat.reply_reference = reply_reference
@@ -105,13 +106,14 @@ class ChatUitls:
                 search_docs_block_from_vector_db(tenant_code, collection_name, context_intent,
                                                  limit=5)  ##attention,there use context_intent instead of query
 
-            doc_hit_indices = [i for i, s in enumerate(doc_scores) if doc_scores[i] <= doc_hit_score]
+            # COSINE: 越大越相似，所以使用 >= 判断
+            doc_hit_indices = [i for i, s in enumerate(doc_scores) if doc_scores[i] >= doc_hit_score]
             doc_hit_indices=doc_hit_indices[0:rag_doc_counts]
 
-            print(f'====>doc_hit_indices={doc_hit_indices}',flush=True)
+            logger.debug(f'文档命中索引: {doc_hit_indices}')
 
             if doc_hit_indices:
-                print(f'=====>hit doc:query={query}, context_intent={context_intent}',flush=True)
+                logger.info(f'命中文档: query={query}, context_intent={context_intent}')
 
                 reference_docs = [doc_contents[i] for i in doc_hit_indices if i < len(doc_contents)]
                 reference_sources = [doc_sources[i] for i in doc_hit_indices if i < len(doc_sources)]
@@ -135,7 +137,7 @@ class ChatUitls:
                 return result_dic
 
             if open_llm_internet_answer=='yes':
-                print(f'=====>search from internet:query={query}, context_intent={context_intent}',flush=True)
+                logger.info(f'从互联网搜索: query={query}, context_intent={context_intent}')
 
                 chat_stat.round = cur_round
                 chat_stat.user_question = query
@@ -157,7 +159,7 @@ class ChatUitls:
                     return result_dic
 
             if open_llm_free_answer=='yes':
-                print(f'=====>llm free answer:query={query}, context_intent={context_intent}',flush=True)
+                logger.info(f'LLM自由回答: query={query}, context_intent={context_intent}')
 
                 chat_stat.round = cur_round
                 chat_stat.user_question = query
@@ -177,7 +179,7 @@ class ChatUitls:
                 result_dic['response']=response
                 return result_dic
 
-            print(f'=====>no answer:query={query}, context_intent={context_intent}',flush=True)
+            logger.warning(f'无答案: query={query}, context_intent={context_intent}')
 
             chat_stat.round = cur_round
             chat_stat.user_question = query

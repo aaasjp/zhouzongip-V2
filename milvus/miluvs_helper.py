@@ -9,8 +9,6 @@ import logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
-DOC_FROM_QA_SOURCE = 'CONVERT_FROM_QA'
-
 ##加载配置文件
 with open('./config/config.json', 'r') as f:
     config = json.load(f)
@@ -49,6 +47,37 @@ def doc_collection_schema():
         FieldSchema(name='block_id', dtype=DataType.INT64, is_primary=False),
         FieldSchema(name='content', dtype=DataType.VARCHAR, max_length=20000),
         FieldSchema(name='source', dtype=DataType.VARCHAR, max_length=2000),
+        FieldSchema(name='embedding', dtype=DataType.FLOAT_VECTOR, dim=1024),
+        FieldSchema(name='metadata', dtype=DataType.JSON, max_length=2000)
+    ]
+    return CollectionSchema(fields=fields)
+
+
+def qa_global_collection_schema():
+    """全局QA collection的schema，包含tenant_code和org_code字段"""
+    fields = [
+        FieldSchema(name='id', dtype=DataType.INT64, is_primary=True, auto_id=True),
+        FieldSchema(name='question', dtype=DataType.VARCHAR, max_length=2000),
+        FieldSchema(name='answer', dtype=DataType.VARCHAR, max_length=20000),
+        FieldSchema(name='source', dtype=DataType.VARCHAR, max_length=2000),
+        FieldSchema(name='tenant_code', dtype=DataType.VARCHAR, max_length=200),
+        FieldSchema(name='org_code', dtype=DataType.VARCHAR, max_length=200),
+        FieldSchema(name='embedding', dtype=DataType.FLOAT_VECTOR, dim=1024),
+        FieldSchema(name='metadata', dtype=DataType.JSON, max_length=2000)
+    ]
+    return CollectionSchema(fields=fields)
+
+
+def doc_global_collection_schema():
+    """全局DOC collection的schema，包含tenant_code和org_code字段"""
+    fields = [
+        FieldSchema(name='id', dtype=DataType.INT64, is_primary=True, auto_id=True),
+        FieldSchema(name='file_name', dtype=DataType.VARCHAR, max_length=2000),
+        FieldSchema(name='block_id', dtype=DataType.INT64, is_primary=False),
+        FieldSchema(name='content', dtype=DataType.VARCHAR, max_length=20000),
+        FieldSchema(name='source', dtype=DataType.VARCHAR, max_length=2000),
+        FieldSchema(name='tenant_code', dtype=DataType.VARCHAR, max_length=200),
+        FieldSchema(name='org_code', dtype=DataType.VARCHAR, max_length=200),
         FieldSchema(name='embedding', dtype=DataType.FLOAT_VECTOR, dim=1024),
         FieldSchema(name='metadata', dtype=DataType.JSON, max_length=2000)
     ]
@@ -94,6 +123,31 @@ def create_collection(tenant_code, collection_name):
     collection.load()
     logger.info(f"向量库[{collection_doc_name}]创建成功")
 
+    # 创建全局数据库和collection（如果不存在）
+    global_db_name = config_name_convention_dic['global_database']
+    global_collection_qa_name = config_name_convention_dic['global_collection_qa']
+    global_collection_doc_name = config_name_convention_dic['global_collection_doc']
+    
+    connections.connect(host=config_milvus_dic['host'], port=config_milvus_dic['port'])
+    if global_db_name not in db.list_database():
+        db.create_database(global_db_name)
+        logger.info(f"全局数据库[{global_db_name}]创建成功")
+    
+    connections.connect(host=config_milvus_dic['host'], port=config_milvus_dic['port'], db_name=global_db_name)
+    exist_global_collection_list = utility.list_collections()
+    
+    if global_collection_qa_name not in exist_global_collection_list:
+        collection = Collection(global_collection_qa_name, schema=qa_global_collection_schema())
+        collection.create_index(field_name="embedding", index_params=index_params)
+        collection.load()
+        logger.info(f"全局向量库[{global_collection_qa_name}]创建成功")
+    
+    if global_collection_doc_name not in exist_global_collection_list:
+        collection = Collection(global_collection_doc_name, schema=doc_global_collection_schema())
+        collection.create_index(field_name="embedding", index_params=index_params)
+        collection.load()
+        logger.info(f"全局向量库[{global_collection_doc_name}]创建成功")
+
     logger.info(f"向量库[{collection_name}]下的问答库和文档库创建成功")
     return True, f"向量库[{collection_name}]下的问答库和文档库创建成功"
 
@@ -128,8 +182,8 @@ def delete_collection(tenant_code, collection_name):
     return True, f"向量库[{collection_name}]下的问答库和文档库删除成功"
 
 
-def insert_qa_to_collection(tenant_code, collection_name, question_list, answer_list, source_list, metadata_list):
-    logger.info(f"调用方法:insert_qa_to_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, 问答对数量={len(question_list)}")
+def insert_qa_to_collection(tenant_code, collection_name, question_list, answer_list, source_list, metadata_list, org_code=''):
+    logger.info(f"调用方法:insert_qa_to_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, org_code={org_code}, 问答对数量={len(question_list)}")
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
 
@@ -181,26 +235,34 @@ def insert_qa_to_collection(tenant_code, collection_name, question_list, answer_
     collection.flush()
     logger.info(f'插入向量库[{collection_name}]成功，新增问答对{len(question_list_to_insert)}条，已经存在而无需新增的问答对{exist_quest_count}条')
 
-    if config['convert_qa_to_doc'] == 'yes':
-        logger.debug('convert_qa_to_doc==yes，开始将问答对转换为文档')
-        doc_name_list = []
-        doc_content_list = []
-        doc_source_list = []
-        for i in range(len(question_list)):
-            doc_name_list.append(question_list[i])
-            doc_content_list.append(f'{question_list[i]}\n{answer_list[i]}')
-            doc_source_list.append(DOC_FROM_QA_SOURCE)
-        is_success, msg = insert_docs_to_collection(tenant_code, collection_name, doc_name_list, doc_content_list,
-                                                    doc_source_list, metadata_list)
-        if not is_success:
-            logger.error(f'{msg}')
-            return False, msg
+    # 同步插入到全局collection
+    try:
+        global_db_name = config_name_convention_dic['global_database']
+        global_collection_qa_name = config_name_convention_dic['global_collection_qa']
+        
+        connections.connect(host=config_milvus_dic['host'], port=config_milvus_dic['port'], db_name=global_db_name)
+        global_collection = Collection(name=global_collection_qa_name)
+        
+        # 为全局collection准备数据，添加tenant_code和org_code
+        tenant_code_list = [tenant_code] * len(question_list_to_insert)
+        org_code_list = [org_code] * len(question_list_to_insert)
+        
+        # 全局collection的数据格式：[question, answer, source, tenant_code, org_code, embedding, metadata]
+        global_data = [question_list_to_insert, answer_list_to_insert, source_list_to_insert, 
+                      tenant_code_list, org_code_list, question_embeddings, metadata_list_to_insert]
+        global_collection.insert(data=global_data)
+        global_collection.flush()
+        logger.info(f'同步插入全局向量库[{global_collection_qa_name}]成功，新增问答对{len(question_list_to_insert)}条')
+    except Exception as e:
+        import traceback
+        logger.error(f'同步插入全局向量库失败: {traceback.format_exc()}')
+        # 不因为全局插入失败而影响主流程
 
     return True, f"插入向量库[{collection_name}]成功，新增问答对{len(question_list)}条，已经存在而无需新增的问答对{exist_quest_count}条"
 
 
-def upsert_qa_to_collection(tenant_code, collection_name, question_list, answer_list, source_list, metadata_list):
-    logger.info(f"调用方法:upsert_qa_to_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, 问答对数量={len(question_list)}")
+def upsert_qa_to_collection(tenant_code, collection_name, question_list, answer_list, source_list, metadata_list, org_code=''):
+    logger.info(f"调用方法:upsert_qa_to_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, org_code={org_code}, 问答对数量={len(question_list)}")
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
 
@@ -230,7 +292,7 @@ def upsert_qa_to_collection(tenant_code, collection_name, question_list, answer_
         return False, f"更新问答对:先删除已存在的问答对出错:{msg}"
 
     is_succ, msg = insert_qa_to_collection(tenant_code, collection_name, question_list, answer_list, source_list,
-                                           metadata_list)
+                                           metadata_list, org_code)
     if not is_succ:
         logger.error(f"更新问答对：删除之后插入问答对出错:{msg}")
         return False, f"更新问答对：删除之后插入问答对出错:{msg}"
@@ -240,8 +302,8 @@ def upsert_qa_to_collection(tenant_code, collection_name, question_list, answer_
 
 
 def insert_docs_to_collection(tenant_code, collection_name, doc_name_list, doc_content_list, source_list,
-                              metadata_list):
-    logger.info(f"调用方法:insert_doc_to_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, 文档数量={len(doc_name_list)}")
+                              metadata_list, org_code=''):
+    logger.info(f"调用方法:insert_doc_to_collection，参数为:tenant_code={tenant_code}, collection_name={collection_name}, org_code={org_code}, 文档数量={len(doc_name_list)}")
     config_name_convention_dic = config['name_convention']
     config_milvus_dic = config['milvus']
 
@@ -314,6 +376,30 @@ def insert_docs_to_collection(tenant_code, collection_name, doc_name_list, doc_c
     collection.insert(data=data)
     collection.flush()
     logger.info(f"插入docs到向量库[{collection_doc_name}]成功,新增文档{len(doc_name_list)}条，已经存在而无需新增的文档{exist_doc_count}条，共插入{len(new_doc_content_block_list)}个文档块")
+    
+    # 同步插入到全局collection
+    try:
+        global_db_name = config_name_convention_dic['global_database']
+        global_collection_doc_name = config_name_convention_dic['global_collection_doc']
+        
+        connections.connect(host=config_milvus_dic['host'], port=config_milvus_dic['port'], db_name=global_db_name)
+        global_collection = Collection(name=global_collection_doc_name)
+        
+        # 为全局collection准备数据，添加tenant_code和org_code
+        tenant_code_list = [tenant_code] * len(new_doc_content_block_list)
+        org_code_list = [org_code] * len(new_doc_content_block_list)
+        
+        # 全局collection的数据格式：[file_name, block_id, content, source, tenant_code, org_code, embedding, metadata]
+        global_data = [new_doc_name_list, new_doc_block_id_list, new_doc_content_block_list, new_source_list,
+                      tenant_code_list, org_code_list, block_embeddings, new_metadata_list]
+        global_collection.insert(data=global_data)
+        global_collection.flush()
+        logger.info(f'同步插入全局向量库[{global_collection_doc_name}]成功，新增文档块{len(new_doc_content_block_list)}个')
+    except Exception as e:
+        import traceback
+        logger.error(f'同步插入全局向量库失败: {traceback.format_exc()}')
+        # 不因为全局插入失败而影响主流程
+    
     return True, f"插入docs到向量库[{collection_doc_name}]成功,新增文档{len(doc_name_list)}条，已经存在而无需新增的文档{exist_doc_count}条"
 
 
@@ -350,15 +436,6 @@ def delete_qa_from_collection(tenant_code, collection_name, question_list):
     collection.flush()
 
     logger.info(f"从向量库[{collection_qa_name}]删除问答对成功，共删除{len(question_list)}条")
-
-    if config['convert_qa_to_doc'] == 'yes':
-        logger.debug('convert_qa_to_doc==yes，开始删除对应的文档')
-        is_succ, msg = delete_docs_from_collection(tenant_code, collection_name, doc_name_list=question_list)
-        if not is_succ:
-            logger.error(f"删除问答对对应的文档失败: {msg}")
-            return False, msg
-
-    logger.info(f"从向量库[{collection_name}]删除问答对成功")
     return True, f"从向量库[{collection_name}]删除问答对成功"
 
 

@@ -41,7 +41,7 @@ class SQLDatabase:
                     """
                 self.cursor.execute(sql_update, (tenant_code, user_id, chat_session, session_id))
                 self.connection.commit()
-                print(f"更新会话成功：sesssion_id={session_id}")
+                logger.info(f"更新会话成功: session_id={session_id}")
             else:
                 sql_insert = """
                         INSERT INTO t_conversation (session_id, tenant_code, user_id, chat_session)
@@ -49,11 +49,11 @@ class SQLDatabase:
                     """
                 self.cursor.execute(sql_insert, (session_id, tenant_code, user_id, chat_session))
                 self.connection.commit()
-                print(f"插入会话成功：sesssion_id={session_id}")
+                logger.info(f"插入会话成功: session_id={session_id}")
 
         except Exception:
             import traceback
-            logging.error(f"保存会话失败： {traceback.format_exc()}")
+            logger.error(f"保存会话失败: {traceback.format_exc()}")
             raise
         finally:
             self.cursor.close()

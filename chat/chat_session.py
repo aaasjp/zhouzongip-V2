@@ -75,17 +75,17 @@ class ChatSessionManager:
     ##主要在session_dic中增加一个槽位方session，如果已经有槽位了，直接返回。如果没有，就看数据库有没有，有的话放到槽位；数据库也没有就初始化一个
     def add_session(self, session_id):
         if session_id in self.session_dic:
-            print(f"session already exists: {session_id}",flush=True)
+            logger.debug(f"session已存在: {session_id}")
         else:
             conversation, chat_session_str = SQLDatabase().get_conversation(session_id=session_id)
             if conversation:
                 chat_session = ChatSession(session_id)
                 chat_session.deserialize(chat_session_str)
                 self.session_dic[session_id] = chat_session
-                print(f"add session from mysql: {session_id}",flush=True)
+                logger.info(f"从MySQL添加session: {session_id}")
             else:
                 self.session_dic[session_id] = ChatSession(session_id)
-                print(f"add new session: {session_id}",flush=True)
+                logger.info(f"添加新session: {session_id}")
 
     def get_session(self, session_id) -> ChatSession:
         return self.session_dic.get(session_id, None)
@@ -110,7 +110,7 @@ class ChatSessionManager:
             for chatstat in cur_session.chat_state_history:
                 #print(f'=====>chatstat={chatstat},{type(chatstat)}')
                 history.append((chatstat.user_question, chatstat.reply))
-        print(f'=====>get history={history}',flush=True)
+        logger.debug(f'获取历史记录: {history}')
         return history
 
     def update_last_reply_to_chat_state(self, session_id, final_answer):
@@ -123,7 +123,7 @@ class ChatSessionManager:
             chat_session_str = chat_session.serialize()
             SQLDatabase().save_conversation(session_id=session_id, tenant_code=tenant_code, user_id=user_id,
                                             chat_session=chat_session_str)
-            print(f'save chat session to mysql completed。{session_id}',flush=True)
+            logger.info(f'保存聊天session到MySQL完成: {session_id}')
 
     def remove_session(self, session_id):
         if session_id in self.session_dic:
