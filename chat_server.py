@@ -6,8 +6,8 @@ import logging
 import json
 import os
 import uuid
-from typing import Optional, List, Dict, Any, Generator
-from flask import Flask, request, jsonify, Response, stream_with_context
+from typing import Optional, List, Dict, Any, Generator, Tuple
+from flask import Blueprint, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
 
 from llm.llm_service import LlmService
@@ -15,11 +15,14 @@ from milvus.miluvs_helper import search_from_collection
 from utils.file_loader import extract_content_from_file
 from chat.chat_service import ChatService
 from minio_utils.minio_client import upload_file
+from config.log_config import setup_chat_service_logging
 
-logger = logging.getLogger(__name__)
+# 配置对话服务日志
+setup_chat_service_logging()
+logger = logging.getLogger('chat_service')
 
-app = Flask(__name__)
-CORS(app)
+# 创建 Blueprint
+chat_bp = Blueprint('chat', __name__)
 
 # 加载配置文件
 with open('./config/config.json', 'r', encoding='utf-8') as f:
@@ -48,7 +51,7 @@ AI回答：{answer[:500]}  # 限制回答长度避免token过多
         response = llm_service.inference(
             prompt=prompt,
             stream=False,
-            generate_params={'temperature': 0.7, 'max_tokens': 200}
+            generate_params={'temperature': 0.7, 'max_tokens': 2000}
         )
         
         if isinstance(response, str):
@@ -60,7 +63,7 @@ AI回答：{answer[:500]}  # 限制回答长度避免token过多
         else:
             return []
     except Exception as e:
-        logger.error(f"生成延申问题失败: {e}")
+        logger.error(f"生成延申问题失败: {e}，user_question={user_question[:100]}")
         return []
 
 
@@ -92,7 +95,67 @@ def format_sources(entities: List[Dict]) -> Dict[str, Any]:
     }
 
 
-@app.route('/chat_service/chat', methods=['POST'])
+def truncate_text(text: str, max_length: int) -> str:
+    """截断文本到指定长度"""
+    if len(text) <= max_length:
+        return text
+    return text[:max_length]
+
+
+def limit_input_length(system_prompt: str, question: str, history: List[Tuple[str, str]], max_chars: int = 8192) -> Tuple[str, str, List[Tuple[str, str]]]:
+    """
+    限制输入总字符数不超过max_chars
+    优先保留question和最近的history，然后保留system_prompt
+    
+    Returns:
+        (system_prompt, question, history) - 截断后的内容
+    """
+    # 创建history的副本，避免修改原始列表
+    history = list(history)
+    
+    # 计算question和history的字符数
+    question_len = len(question)
+    history_len = 0
+    for q, a in history:
+        history_len += len(q) + len(a) + 20  # 加上格式字符的估算
+    
+    # 计算总字符数
+    system_len = len(system_prompt)
+    total_len = system_len + question_len + history_len
+    
+    # 如果超过限制，需要截断
+    if total_len > max_chars:
+        # 预留空间：question至少保留，history尽量保留，system_prompt可以截断
+        reserved_for_question = min(question_len, 1000)  # question最多1000字符
+        reserved_for_history = min(history_len, 3000)  # history最多3000字符
+        available_for_system = max_chars - reserved_for_question - reserved_for_history - 200  # 预留200字符缓冲
+        
+        # 截断question
+        if question_len > reserved_for_question:
+            question = truncate_text(question, reserved_for_question)
+        
+        # 截断history（保留最近的对话）
+        if history_len > reserved_for_history:
+            truncated_history = []
+            current_len = 0
+            for q, a in reversed(history):  # 从最近的开始
+                q_len = len(q)
+                a_len = len(a)
+                if current_len + q_len + a_len + 20 <= reserved_for_history:
+                    truncated_history.insert(0, (q, a))
+                    current_len += q_len + a_len + 20
+                else:
+                    break
+            history = truncated_history
+        
+        # 截断system_prompt
+        if system_len > available_for_system:
+            system_prompt = truncate_text(system_prompt, max(available_for_system, 100))  # 至少保留100字符
+    
+    return system_prompt, question, history
+
+
+@chat_bp.route('/chat_service/chat', methods=['POST'])
 def chat():
     """问答接口
     
@@ -103,13 +166,17 @@ def chat():
     - tenant_code: 租户代码（可选）
     - org_code: 组织代码（可选）
     - use_vector_db: 是否使用向量库（默认true）
-    - use_uploaded_doc: 是否使用上传的文档（默认false）
-    - uploaded_doc_url: 上传的文档URL（当use_uploaded_doc为true时必填）
+    - uploaded_docs: 上传的文档列表（支持多个文档），格式：[{file_name, file_url, content, parse_success}]
+      - file_url: 文档URL（用于展示文档来源）
+      - content: 文档内容（用于问答）
     - stream: 是否流式输出（默认true）
     - limit: 检索结果数量（默认5）
     """
     data = request.get_json()
-    logger.info(f'问答请求, data={data}')
+    user_id = data.get('user_id', '')
+    session_id = data.get('session_id', '')
+    question = data.get('question', '')[:100]  # 只记录前100个字符
+    logger.info(f'问答请求，user_id={user_id}, session_id={session_id}, question={question}..., use_vector_db={data.get("use_vector_db", True)}, stream={data.get("stream", True)}')
     
     user_id = data.get('user_id', '')
     session_id = data.get('session_id', '')
@@ -117,10 +184,11 @@ def chat():
     tenant_code = data.get('tenant_code', '')
     org_code = data.get('org_code', '')
     use_vector_db = data.get('use_vector_db', True)
-    use_uploaded_doc = data.get('use_uploaded_doc', False)
-    uploaded_doc_url = data.get('uploaded_doc_url', '')
+    uploaded_docs = data.get('uploaded_docs', [])  # 支持多个文档，格式：[{file_name, file_url, content, parse_success}]
+    if not isinstance(uploaded_docs, list):
+        uploaded_docs = []
     stream = data.get('stream', True)
-    limit = data.get('limit', 5)
+    limit = data.get('limit', config.get('search_limit', 3))  # 默认从配置文件读取
     
     # 参数验证
     if not user_id:
@@ -143,7 +211,9 @@ def chat():
         return jsonify({'status': 'fail', 'msg': '会话不存在', 'code': 400, 'data': ''})
     
     # 保存用户问题
-    chat_service.save_message(session_id, user_id, 'user', question)
+    is_succ, msg = chat_service.save_message(session_id, user_id, 'user', question)
+    if not is_succ:
+        logger.warning(f"保存用户消息失败: {msg}，session_id={session_id}, user_id={user_id}")
     
     # 获取对话历史
     history = chat_service.get_conversation_history(session_id)
@@ -152,21 +222,44 @@ def chat():
     context_parts = []
     sources_info = {'count': 0, 'documents': []}
     
-    # 优先使用上传的文档
-    if use_uploaded_doc and uploaded_doc_url:
+    # 优先使用上传的文档（支持多个文档）
+    if uploaded_docs and len(uploaded_docs) > 0:
         try:
-            is_succ, doc_content = extract_content_from_file(uploaded_doc_url, ocr_config=ocr_config)
-            if is_succ and doc_content:
-                context_parts.append(f"参考文档内容：\n{doc_content[:3000]}")  # 限制长度
+            doc_contents = []
+            doc_names = []
+            for doc in uploaded_docs:
+                if isinstance(doc, dict):
+                    # 过滤出解析成功的文档
+                    if doc.get('parse_success') and doc.get('content'):
+                        content = doc.get('content', '')
+                        file_name = doc.get('file_name', '用户上传文档')
+                        file_url = doc.get('file_url', '')
+                        
+                        if content:
+                            doc_contents.append(content)
+                            doc_names.append({
+                                'name': file_name,
+                                'url': file_url if file_url else ''
+                            })
+            
+            if doc_contents:
+                # 合并多个文档内容，但需要控制总长度
+                combined_content = "\n\n---文档分隔---\n\n".join(doc_contents)
+                # 限制总长度，为其他内容预留空间
+                max_doc_length = 5000  # 文档内容最多5000字符
+                if len(combined_content) > max_doc_length:
+                    combined_content = truncate_text(combined_content, max_doc_length)
+                context_parts.append(f"参考文档内容：\n{combined_content}")
                 sources_info = {
-                    'count': 1,
-                    'documents': [{'name': '用户上传文档', 'url': uploaded_doc_url}]
+                    'count': len(doc_names),
+                    'documents': doc_names
                 }
+                logger.info(f"使用上传文档内容，文档数量: {len(doc_names)}")
         except Exception as e:
-            logger.error(f"解析上传文档失败: {e}")
+            logger.error(f"处理上传文档失败: {e}，uploaded_docs={uploaded_docs}")
     
     # 如果使用向量库检索（且没有使用上传文档）
-    elif use_vector_db and not (use_uploaded_doc and uploaded_doc_url):
+    elif use_vector_db and not (uploaded_docs and len(uploaded_docs) > 0):
         try:
             # 构建过滤表达式
             filter_expr = ""
@@ -177,18 +270,12 @@ def chat():
             elif org_code:
                 filter_expr = f"org_code == '{org_code}'"
             
-            # 先搜索QA集合（不传tenant_code和org_code则使用全部向量知识库）
-            qa_results = search_from_collection(
-                tenant_code=tenant_code if tenant_code else '',
-                org_code=org_code if org_code else '',
-                collection_type='QA',
-                query_list=[question],
-                filter_expr=filter_expr if filter_expr else '',
-                limit=limit,
-                use_hybrid=True  # 使用BM25+向量检索
-            )
+            # 从配置文件读取相似度阈值
+            similarity_thresholds = config.get('similarity_thresholds', {})
+            vector_similarity_threshold = similarity_thresholds.get('vector_similarity_threshold', 0.75)
+            rrf_similarity_threshold = similarity_thresholds.get('rrf_similarity_threshold', 0.85)
             
-            # 再搜索DOC集合（不传tenant_code和org_code则使用全部向量知识库）
+            # 只搜索DOC集合（不传tenant_code和org_code则使用全部向量知识库）
             doc_results = search_from_collection(
                 tenant_code=tenant_code if tenant_code else '',
                 org_code=org_code if org_code else '',
@@ -196,13 +283,13 @@ def chat():
                 query_list=[question],
                 filter_expr=filter_expr if filter_expr else '',
                 limit=limit,
-                use_hybrid=True
+                use_hybrid=True,
+                vector_similarity_threshold=vector_similarity_threshold,
+                rrf_similarity_threshold=rrf_similarity_threshold
             )
             
-            # 合并结果
+            # 只使用DOC结果
             all_entities = []
-            if isinstance(qa_results, dict) and qa_results.get('entities'):
-                all_entities.extend(qa_results['entities'][0] if qa_results['entities'] else [])
             if isinstance(doc_results, dict) and doc_results.get('entities'):
                 all_entities.extend(doc_results['entities'][0] if doc_results['entities'] else [])
             
@@ -224,9 +311,9 @@ def chat():
                     context_parts.append("参考知识库内容：\n" + "\n\n".join(context_texts))
         
         except Exception as e:
-            logger.error(f"向量库检索失败: {e}")
+            logger.error(f"向量库检索失败: {e}，tenant_code={tenant_code}, org_code={org_code}, query={question[:100]}")
             import traceback
-            logger.exception(traceback.format_exc())
+            logger.exception(f"向量库检索异常详情: {traceback.format_exc()}")
     
     # 构建系统提示词
     system_prompt = """你是一个专业的AI助手，能够基于提供的知识库内容回答用户问题。
@@ -235,6 +322,9 @@ def chat():
     
     if context_parts:
         system_prompt += "\n\n" + "\n\n".join(context_parts)
+    
+    # 限制输入总字符数不超过8192
+    system_prompt, question, history = limit_input_length(system_prompt, question, history, max_chars=8192)
     
     # 调用LLM生成回答
     try:
@@ -258,9 +348,11 @@ def chat():
                     suggested_questions = generate_suggested_questions(question, full_answer, llm_service)
                     
                     # 保存完整回答（包含延申问题）
-                    chat_service.save_message(session_id, user_id, 'assistant', full_answer,
-                                             sources=sources_info.get('documents', []),
-                                             suggested_questions=suggested_questions)
+                    is_succ, msg = chat_service.save_message(session_id, user_id, 'assistant', full_answer,
+                                                             sources=sources_info.get('documents', []),
+                                                             suggested_questions=suggested_questions)
+                    if not is_succ:
+                        logger.error(f"保存助手消息失败: {msg}，session_id={session_id}, user_id={user_id}")
                     
                     # 返回最终结果
                     final_data = {
@@ -272,9 +364,10 @@ def chat():
                     yield f"data: {json.dumps(final_data, ensure_ascii=False)}\n\n"
                 
                 except Exception as e:
-                    logger.error(f"流式生成回答失败: {e}")
+                    logger.error(f"流式生成回答失败: {e}，session_id={session_id}, user_id={user_id}")
                     import traceback
                     error_msg = traceback.format_exc()
+                    logger.exception(f"流式生成回答异常详情: {traceback.format_exc()}")
                     yield f"data: {json.dumps({'error': error_msg, 'done': True}, ensure_ascii=False)}\n\n"
             
             return Response(stream_with_context(generate()), mimetype='text/event-stream')
@@ -294,9 +387,11 @@ def chat():
             suggested_questions = generate_suggested_questions(question, answer, llm_service)
             
             # 保存回答
-            chat_service.save_message(session_id, user_id, 'assistant', answer,
-                                     sources=sources_info.get('documents', []),
-                                     suggested_questions=suggested_questions)
+            is_succ, msg = chat_service.save_message(session_id, user_id, 'assistant', answer,
+                                                     sources=sources_info.get('documents', []),
+                                                     suggested_questions=suggested_questions)
+            if not is_succ:
+                logger.error(f"保存助手消息失败: {msg}，session_id={session_id}, user_id={user_id}")
             
             return jsonify({
                 'status': 'success',
@@ -311,8 +406,9 @@ def chat():
             })
     
     except Exception as e:
-        logger.error(f"生成回答失败: {e}")
+        logger.error(f"生成回答失败: {e}，session_id={session_id}, user_id={user_id}")
         import traceback
+        logger.exception(f"生成回答异常详情: {traceback.format_exc()}")
         return jsonify({
             'status': 'fail',
             'msg': f'生成回答失败: {traceback.format_exc()}',
@@ -321,7 +417,7 @@ def chat():
         })
 
 
-@app.route('/chat_service/sessions', methods=['GET'])
+@chat_bp.route('/chat_service/sessions', methods=['GET'])
 def list_sessions():
     """获取会话列表"""
     user_id = request.args.get('user_id', '')
@@ -341,7 +437,7 @@ def list_sessions():
     })
 
 
-@app.route('/chat_service/session', methods=['POST'])
+@chat_bp.route('/chat_service/session', methods=['POST'])
 def create_session():
     """创建新会话"""
     data = request.get_json()
@@ -370,7 +466,7 @@ def create_session():
     })
 
 
-@app.route('/chat_service/session/<session_id>', methods=['GET'])
+@chat_bp.route('/chat_service/session/<session_id>', methods=['GET'])
 def get_session(session_id):
     """获取会话信息"""
     session = chat_service.get_session(session_id)
@@ -385,7 +481,7 @@ def get_session(session_id):
     })
 
 
-@app.route('/chat_service/session/<session_id>/messages', methods=['GET'])
+@chat_bp.route('/chat_service/session/<session_id>/messages', methods=['GET'])
 def get_messages(session_id):
     """获取会话消息历史"""
     limit = int(request.args.get('limit', 100))
@@ -403,7 +499,7 @@ def get_messages(session_id):
     })
 
 
-@app.route('/chat_service/session/<session_id>/title', methods=['PUT'])
+@chat_bp.route('/chat_service/session/<session_id>/title', methods=['PUT'])
 def update_session_title(session_id):
     """更新会话标题"""
     data = request.get_json()
@@ -424,7 +520,7 @@ def update_session_title(session_id):
     })
 
 
-@app.route('/chat_service/session/<session_id>', methods=['DELETE'])
+@chat_bp.route('/chat_service/session/<session_id>', methods=['DELETE'])
 def delete_session(session_id):
     """删除会话"""
     is_succ, msg = chat_service.delete_session(session_id)
@@ -439,7 +535,7 @@ def delete_session(session_id):
     })
 
 
-@app.route('/chat_service/session/<session_id>/restore', methods=['POST'])
+@chat_bp.route('/chat_service/session/<session_id>/restore', methods=['POST'])
 def restore_session(session_id):
     """恢复会话"""
     is_succ, msg = chat_service.restore_session(session_id)
@@ -454,7 +550,7 @@ def restore_session(session_id):
     })
 
 
-@app.route('/chat_service/upload', methods=['POST'])
+@chat_bp.route('/chat_service/upload', methods=['POST'])
 def upload_document():
     """上传文档到MinIO"""
     if 'file' not in request.files:
@@ -485,8 +581,9 @@ def upload_document():
             }
         })
     except Exception as e:
-        logger.error(f"上传文件失败: {e}")
+        logger.error(f"上传文件失败: {e}，file_name={file.filename if file else 'unknown'}")
         import traceback
+        logger.exception(f"上传文件异常详情: {traceback.format_exc()}")
         return jsonify({
             'status': 'fail',
             'msg': f'上传失败: {traceback.format_exc()}',
@@ -495,10 +592,96 @@ def upload_document():
         })
 
 
-if __name__ == '__main__':
-    server_config = config.get('chat_api_server', {})
-    host = server_config.get('host', '0.0.0.0')
-    port = server_config.get('port', 8006)
-    logger.info(f"对话问答服务启动，监听地址: {host}:{port}")
-    app.run(host=host, port=port)
+@chat_bp.route('/chat_service/upload_and_parse', methods=['POST'])
+def upload_and_parse_document():
+    """上传文档到MinIO并解析内容（支持多文件）
+    
+    返回：
+    - file_name: 文件名
+    - file_url: 文件URL（用于展示文档来源）
+    - content: 解析后的文档内容（用于问答）
+    - parse_success: 是否解析成功
+    """
+    # 支持'file'和'files'两种参数名（Element Plus默认使用'file'）
+    files = []
+    if 'file' in request.files:
+        files = request.files.getlist('file')
+    elif 'files' in request.files:
+        files = request.files.getlist('files')
+    
+    if not files or len(files) == 0:
+        return jsonify({'status': 'fail', 'msg': '缺少文件', 'code': 400, 'data': ''})
+    
+    results = []
+    
+    for file in files:
+        if file.filename == '':
+            continue
+        
+        try:
+            # 读取文件数据
+            file_data = file.read()
+            file_name = file.filename
+            
+            # 获取文件MIME类型
+            content_type = file.content_type or 'application/octet-stream'
+            
+            # 上传到MinIO
+            logger.info(f"开始上传文档: {file_name}")
+            file_url = upload_file(file_data, file_name, content_type)
+            
+            # 解析文档内容
+            logger.info(f"开始解析文档: {file_name}, URL: {file_url}")
+            is_succ, doc_content = extract_content_from_file(file_url, ocr_config=ocr_config)
+            
+            if is_succ and doc_content:
+                results.append({
+                    'file_name': file_name,
+                    'file_url': file_url,
+                    'content': doc_content,
+                    'parse_success': True
+                })
+                logger.info(f"文档解析成功: {file_name}，内容长度: {len(doc_content)}")
+            else:
+                # 解析失败
+                error_msg = doc_content if isinstance(doc_content, str) else '解析失败'
+                logger.warning(f"文档解析失败: {file_name}，错误: {error_msg}")
+                results.append({
+                    'file_name': file_name,
+                    'file_url': file_url,
+                    'content': '',
+                    'parse_success': False,
+                    'parse_error': error_msg
+                })
+        
+        except Exception as e:
+            logger.error(f"处理文件失败: {e}，file_name={file.filename if file else 'unknown'}")
+            import traceback
+            logger.exception(f"处理文件异常详情: {traceback.format_exc()}")
+            results.append({
+                'file_name': file.filename if file else 'unknown',
+                'file_url': '',
+                'content': '',
+                'parse_success': False,
+                'parse_error': f'处理失败: {str(e)}'
+            })
+    
+    if len(results) == 0:
+        return jsonify({
+            'status': 'fail',
+            'msg': '没有成功处理的文件',
+            'code': 400,
+            'data': ''
+        })
+    
+    # 统计成功和失败的数量
+    success_count = sum(1 for r in results if r.get('parse_success', False))
+    total_count = len(results)
+    
+    return jsonify({
+        'status': 'success',
+        'code': 200,
+        'msg': f'处理完成，成功{success_count}/{total_count}个文件',
+        'data': results
+    })
 

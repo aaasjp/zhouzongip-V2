@@ -11,7 +11,8 @@ from mysql.connector import Error
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-logger = logging.getLogger(__name__)
+# 使用chat_service日志记录器，因为MySQL操作属于对话服务
+logger = logging.getLogger('chat_service')
 
 # 加载配置文件
 def load_config():
@@ -33,13 +34,47 @@ class MySQLHelper:
         self.port = MYSQL_CONFIG.get('port', 3306)
         self.user = MYSQL_CONFIG.get('user', 'root')
         self.password = MYSQL_CONFIG.get('password', '')
-        self.db_name = MYSQL_CONFIG.get('db_name', 'peilian')
+        self.db_name = MYSQL_CONFIG.get('db_name', 'ai_helper')
         self.connection = None
+        
+    def _log_sql(self, sql: str, params: tuple = None):
+        """记录SQL执行日志"""
+        # 格式化SQL语句，将参数值替换到占位符中（用于日志显示）
+        formatted_sql = sql
+        if params:
+            try:
+                # 将参数值安全地格式化到SQL中（仅用于日志，不用于实际执行）
+                formatted_params = []
+                for param in params:
+                    if param is None:
+                        formatted_params.append('NULL')
+                    elif isinstance(param, str):
+                        # 转义单引号并截断过长的字符串
+                        escaped = param.replace("'", "''")
+                        if len(escaped) > 200:
+                            escaped = escaped[:200] + '...'
+                        formatted_params.append(f"'{escaped}'")
+                    elif isinstance(param, (int, float)):
+                        formatted_params.append(str(param))
+                    else:
+                        formatted_params.append(f"'{str(param)}'")
+                
+                # 简单替换（注意：这不是安全的SQL执行方式，仅用于日志）
+                formatted_sql = sql
+                for param in formatted_params:
+                    formatted_sql = formatted_sql.replace('%s', param, 1)
+            except Exception as e:
+                formatted_sql = f"{sql} [参数格式化失败: {e}]"
+        
+        logger.info(f"[MySQL执行] 数据库={self.host}:{self.port}/{self.db_name} | SQL={formatted_sql}")
+        if params:
+            logger.debug(f"[MySQL参数] params={params}")
         
     def _get_connection(self):
         """获取数据库连接"""
         try:
             if self.connection is None or not self.connection.is_connected():
+                logger.info(f"[MySQL连接] 连接到数据库: {self.host}:{self.port}/{self.db_name}, user={self.user}")
                 self.connection = mysql.connector.connect(
                     host=self.host,
                     port=self.port,
@@ -49,9 +84,10 @@ class MySQLHelper:
                     charset='utf8mb4',
                     collation='utf8mb4_unicode_ci'
                 )
+                logger.info(f"[MySQL连接] 数据库连接成功: {self.host}:{self.port}/{self.db_name}")
             return self.connection
         except Error as e:
-            logger.error(f"连接MySQL数据库失败: {e}")
+            logger.error(f"[MySQL连接] 连接MySQL数据库失败: host={self.host}:{self.port}, db={self.db_name}, error={e}")
             raise
     
     def close(self):
@@ -103,12 +139,14 @@ class MySQLHelper:
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='对话消息表';
             """
             
+            self._log_sql(create_session_table.strip())
             cursor.execute(create_session_table)
+            self._log_sql(create_message_table.strip())
             cursor.execute(create_message_table)
             conn.commit()
             cursor.close()
             
-            logger.info("对话管理表创建成功")
+            logger.info(f"[MySQL执行] 对话管理表创建成功: {self.host}:{self.port}/{self.db_name}")
             return True, "对话管理表创建成功"
         except Error as e:
             logger.error(f"创建表失败: {e}")
@@ -125,7 +163,9 @@ class MySQLHelper:
             INSERT INTO chat_sessions (user_id, session_id, title, tenant_code, org_code)
             VALUES (%s, %s, %s, %s, %s)
             """
-            cursor.execute(insert_sql, (user_id, session_id, title, tenant_code, org_code))
+            params = (user_id, session_id, title, tenant_code, org_code)
+            self._log_sql(insert_sql.strip(), params)
+            cursor.execute(insert_sql, params)
             conn.commit()
             cursor.close()
             
@@ -145,7 +185,9 @@ class MySQLHelper:
             SELECT * FROM chat_sessions 
             WHERE session_id = %s AND is_deleted = 0
             """
-            cursor.execute(select_sql, (session_id,))
+            params = (session_id,)
+            self._log_sql(select_sql.strip(), params)
+            cursor.execute(select_sql, params)
             result = cursor.fetchone()
             cursor.close()
             
@@ -179,6 +221,7 @@ class MySQLHelper:
             """
             params.append(limit)
             
+            self._log_sql(select_sql.strip(), tuple(params))
             cursor.execute(select_sql, params)
             results = cursor.fetchall()
             cursor.close()
@@ -199,7 +242,9 @@ class MySQLHelper:
             SET title = %s 
             WHERE session_id = %s AND is_deleted = 0
             """
-            cursor.execute(update_sql, (title, session_id))
+            params = (title, session_id)
+            self._log_sql(update_sql.strip(), params)
+            cursor.execute(update_sql, params)
             conn.commit()
             cursor.close()
             
@@ -220,7 +265,9 @@ class MySQLHelper:
             SET is_deleted = 1 
             WHERE session_id = %s
             """
-            cursor.execute(update_sql, (session_id,))
+            params = (session_id,)
+            self._log_sql(update_sql.strip(), params)
+            cursor.execute(update_sql, params)
             conn.commit()
             cursor.close()
             
@@ -241,7 +288,9 @@ class MySQLHelper:
             SET is_deleted = 0 
             WHERE session_id = %s
             """
-            cursor.execute(update_sql, (session_id,))
+            params = (session_id,)
+            self._log_sql(update_sql.strip(), params)
+            cursor.execute(update_sql, params)
             conn.commit()
             cursor.close()
             
@@ -267,7 +316,9 @@ class MySQLHelper:
             INSERT INTO chat_messages (session_id, user_id, role, content, sources, suggested_questions)
             VALUES (%s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(insert_sql, (session_id, user_id, role, content, sources_json, suggested_questions_json))
+            params = (session_id, user_id, role, content, sources_json, suggested_questions_json)
+            self._log_sql(insert_sql.strip(), params)
+            cursor.execute(insert_sql, params)
             conn.commit()
             cursor.close()
             
@@ -289,7 +340,9 @@ class MySQLHelper:
             ORDER BY created_at ASC
             LIMIT %s
             """
-            cursor.execute(select_sql, (session_id, limit))
+            params = (session_id, limit)
+            self._log_sql(select_sql.strip(), params)
+            cursor.execute(select_sql, params)
             results = cursor.fetchall()
             cursor.close()
             

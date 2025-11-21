@@ -60,15 +60,14 @@ npm run preview
 
 在 `vite.config.js` 中配置了API代理：
 - `/vector_db_service` -> `http://localhost:8005`
-- `/chat_service` -> `http://localhost:8006`
+- `/chat_service` -> `http://localhost:8005`
 
 如果后端服务地址不同，请修改 `vite.config.js` 中的 `proxy` 配置。
 
 ## 注意事项
 
 1. **后端服务**：确保后端服务已启动
-   - 向量数据库服务：`http://localhost:8005`
-   - 对话问答服务：`http://localhost:8006`
+   - 统一API服务：`http://localhost:8005`
 
 2. **CORS配置**：确保后端服务已配置CORS，允许前端域名访问。
 

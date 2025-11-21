@@ -3,14 +3,14 @@ import json
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 import torch
-from config.log_config_vector_db import setup_logging
+from config.log_config import setup_vector_db_logging
 from rank_bm25 import BM25Okapi
 import jieba
 from collections import defaultdict
 
 import logging
-setup_logging()
-logger = logging.getLogger(__name__)
+setup_vector_db_logging()
+logger = logging.getLogger('vector_db')
 
 ##加载配置文件
 with open('./config/config.json', 'r', encoding='utf-8') as f:
@@ -26,8 +26,8 @@ except ImportError:
 
 
 embedding_model = HuggingFaceBgeEmbeddings(
-    #model_name=config['embedding_model_path'],
-    model_name="BAAI/bge-large-en-v1.5",
+    model_name=config['embedding_model_path'],
+    #model_name="BAAI/bge-large-en-v1.5",
     model_kwargs = {'device': device},
     encode_kwargs={'normalize_embeddings': True}  # set True to compute cosine similarity
 )
@@ -226,8 +226,14 @@ def insert_qa_to_collection(tenant_code, org_code, question_list, answer_list, s
     for i in range(len(question_list)):
         q = question_list[i]
         escaped_question = q.replace("'", "\\'")
-        filter_expr = f"question == '{escaped_question}' && tenant_code == '{tenant_code}' && org_code == '{org_code}'"
-        res = collection.query(filter_expr)
+        # 构建过滤表达式，只有当tenant_code和org_code不为空时才加入条件
+        filter_parts = [f"question == '{escaped_question}'"]
+        if tenant_code:
+            filter_parts.append(f"tenant_code == '{tenant_code}'")
+        if org_code:
+            filter_parts.append(f"org_code == '{org_code}'")
+        filter_expr = " && ".join(filter_parts)
+        res = collection.query(expr=filter_expr)
         if len(res) > 0:
             exist_quest_count += 1
             to_delete_questions.append(q)
@@ -310,8 +316,14 @@ def insert_docs_to_collection(tenant_code, org_code, doc_name_list, doc_content_
     for i in range(len(doc_name_list)):
         dname = doc_name_list[i]
         escaped_dname = dname.replace("'", "\\'")
-        filter_expr = f"file_name == '{escaped_dname}' && tenant_code == '{tenant_code}' && org_code == '{org_code}'"
-        res = collection.query(filter_expr)
+        # 构建过滤表达式，只有当tenant_code和org_code不为空时才加入条件
+        filter_parts = [f"file_name == '{escaped_dname}'"]
+        if tenant_code:
+            filter_parts.append(f"tenant_code == '{tenant_code}'")
+        if org_code:
+            filter_parts.append(f"org_code == '{org_code}'")
+        filter_expr = " && ".join(filter_parts)
+        res = collection.query(expr=filter_expr)
         if len(res) > 0:
             exist_doc_count += 1
             to_delete_file_names.append(dname)
@@ -397,7 +409,13 @@ def delete_qa_from_collection(tenant_code, org_code, question_list):
 
     for question in question_list:
         escaped_question = question.replace("'", "\\'")
-        filter_expr = f"question == '{escaped_question}' && tenant_code == '{tenant_code}' && org_code == '{org_code}'"
+        # 构建过滤表达式，只有当tenant_code和org_code不为空时才加入条件
+        filter_parts = [f"question == '{escaped_question}'"]
+        if tenant_code:
+            filter_parts.append(f"tenant_code == '{tenant_code}'")
+        if org_code:
+            filter_parts.append(f"org_code == '{org_code}'")
+        filter_expr = " && ".join(filter_parts)
         collection.delete(filter_expr)
     collection.flush()
 
@@ -427,7 +445,13 @@ def delete_docs_from_collection(tenant_code, org_code, doc_name_list):
 
     for file_name in doc_name_list:
         escaped_file_name = file_name.replace("'", "\\'")
-        filter_expr = f"file_name == '{escaped_file_name}' && tenant_code == '{tenant_code}' && org_code == '{org_code}'"
+        # 构建过滤表达式，只有当tenant_code和org_code不为空时才加入条件
+        filter_parts = [f"file_name == '{escaped_file_name}'"]
+        if tenant_code:
+            filter_parts.append(f"tenant_code == '{tenant_code}'")
+        if org_code:
+            filter_parts.append(f"org_code == '{org_code}'")
+        filter_expr = " && ".join(filter_parts)
         collection.delete(filter_expr)
     collection.flush()
 
@@ -454,11 +478,22 @@ def _build_bm25_index(collection, final_filter, collection_type):
     fields = [f.name for f in collection.schema.fields if f.name != 'embedding']
     try:
         # 查询所有符合条件的文档
-        query_result = collection.query(
-            expr=final_filter if final_filter else None,
-            output_fields=fields,
-            limit=16384  # Milvus默认最大查询数量
-        )
+        # expr参数是必需的，如果final_filter为空，使用主键id >= 0查询所有数据
+        if final_filter:
+            query_params = {
+                'expr': final_filter,
+                'output_fields': fields,
+                'limit': 16384  # Milvus默认最大查询数量
+            }
+        else:
+            # 当没有过滤条件时，使用主键id >= 0来查询所有数据
+            query_params = {
+                'expr': 'id >= 0',
+                'output_fields': fields,
+                'limit': 16384  # Milvus默认最大查询数量
+            }
+        
+        query_result = collection.query(**query_params)
         
         if len(query_result) == 0:
             logger.warning("没有找到符合条件的文档用于构建BM25索引")
@@ -583,22 +618,25 @@ def _reciprocal_rank_fusion(vector_results, bm25_results, k=20, bm25_weight=1.2)
     return fused_results
 
 
-def search_from_collection(tenant_code, org_code, collection_type, query_list, filter_expr='', limit=5, use_hybrid=False):
+def search_from_collection(tenant_code, org_code, collection_type, query_list, filter_expr='', limit=5, use_hybrid=False, vector_similarity_threshold=None, rrf_similarity_threshold=None):
     """从全局collection搜索
     
     Args:
         tenant_code: 租户代码
-        org_code: 知识库名称
+        org_code: 部门代码
         collection_type: 集合类型，'QA'或'DOC'
         query_list: 查询文本列表
         filter_expr: 过滤表达式
         limit: 返回结果数量限制
         use_hybrid: 是否使用混合检索（向量+BM25），默认False
+        vector_similarity_threshold: 向量相似度阈值，默认从配置文件读取
+        rrf_similarity_threshold: RRF相似度阈值，默认从配置文件读取
     
     Returns:
         检索结果字典，包含ids、distances、entities
     """
-    logger.info(f"调用方法:search_from_collection，参数为:tenant_code={tenant_code}, org_code={org_code}, collection_type={collection_type}, 查询数量={len(query_list)}, limit={limit}, use_hybrid={use_hybrid}")
+    # 如果参数是None，则不进行阈值过滤；如果不是None，则使用该值进行过滤
+    logger.info(f"调用方法:search_from_collection，参数为:tenant_code={tenant_code}, org_code={org_code}, collection_type={collection_type}, 查询数量={len(query_list)}, limit={limit}, use_hybrid={use_hybrid}, vector_similarity_threshold={vector_similarity_threshold}, rrf_similarity_threshold={rrf_similarity_threshold}")
     logger.info(f"查询内容: {query_list}, 过滤条件: {filter_expr}")
     
     config_milvus_dic = config['milvus']
@@ -657,14 +695,16 @@ def search_from_collection(tenant_code, org_code, collection_type, query_list, f
             # 向量检索
             logger.info(f"开始向量检索，查询: {query}")
             query_embeddings = embedding_model.embed_documents([query])
-            vector_res = collection.search(
-                data=query_embeddings,
-                anns_field="embedding",
-                param=config['search_params'],
-                limit=limit * 5,  # 获取更多结果用于融合
-                expr=final_filter if final_filter else None,
-                output_fields=fields
-            )
+            search_params = {
+                'data': query_embeddings,
+                'anns_field': "embedding",
+                'param': config['search_params'],
+                'limit': limit * 5,  # 获取更多结果用于融合
+                'output_fields': fields
+            }
+            if final_filter:
+                search_params['expr'] = final_filter
+            vector_res = collection.search(**search_params)
             
             vector_results = []
             for hits in vector_res:
@@ -688,8 +728,16 @@ def search_from_collection(tenant_code, org_code, collection_type, query_list, f
             bm25_weight = config.get('hybrid_search', {}).get('bm25_weight', 1.2)
             fused_results = _reciprocal_rank_fusion(vector_results, bm25_results, k=rrf_k, bm25_weight=bm25_weight)
             
+            # 根据RRF相似度阈值过滤结果（如果提供了阈值）
+            if rrf_similarity_threshold is not None:
+                filtered_results = [r for r in fused_results if r.get('rrf_score', 0.0) >= rrf_similarity_threshold]
+                logger.info(f"RRF融合后共{len(fused_results)}条结果，阈值过滤后剩余{len(filtered_results)}条（阈值={rrf_similarity_threshold}）")
+            else:
+                filtered_results = fused_results
+                logger.info(f"RRF融合后共{len(fused_results)}条结果，未应用阈值过滤")
+            
             # 取top-k结果
-            top_results = fused_results[:limit]
+            top_results = filtered_results[:limit]
             
             # 格式化结果
             query_ids = [r.get('id') for r in top_results if r.get('id') is not None]
@@ -706,7 +754,9 @@ def search_from_collection(tenant_code, org_code, collection_type, query_list, f
             "distances": distances,
             "entities": entities
         }
-        logger.info(f'混合检索完成，返回{len(ids)}个查询结果')
+        # 计算总结果数量
+        total_results = sum(len(e) for e in entities)
+        logger.info(f'混合检索完成，{len(ids)}个查询，共返回{total_results}条结果')
         return ret_dic
     
     else:
@@ -716,30 +766,45 @@ def search_from_collection(tenant_code, org_code, collection_type, query_list, f
         query_embeddings = embedding_model.embed_documents(query_list)
         logger.info(f"查询向量嵌入生成完成，开始搜索，过滤条件: {final_filter}")
 
-        res = collection.search(
-            data=query_embeddings,
-            anns_field="embedding",
-            param=config['search_params'],
-            limit=limit,
-            expr=final_filter if final_filter else None,
-            output_fields=fields
-        )
+        search_params = {
+            'data': query_embeddings,
+            'anns_field': "embedding",
+            'param': config['search_params'],
+            'limit': limit,
+            'output_fields': fields
+        }
+        if final_filter:
+            search_params['expr'] = final_filter
+        res = collection.search(**search_params)
 
         ids = []
         distances = []
         entities = []
 
         for hits in res:
-            ids.append(hits.ids)
-            distances.append(hits.distances)
+            query_ids = []
+            query_distances = []
             ents = []
 
-            for hit in hits:
-                ent = {}
-                for f in fields:
-                    ent[f] = hit.get(f)
-                ent['score'] = hit.score
-                ents.append(ent)
+            for rank, hit in enumerate(hits, start=1):
+                # 根据向量相似度阈值过滤结果（如果提供了阈值）
+                if vector_similarity_threshold is None or hit.score >= vector_similarity_threshold:
+                    ent = {}
+                    for f in fields:
+                        ent[f] = hit.get(f)
+                    ent['score'] = hit.score  # 向量相似度分数
+                    ent['vector_rank'] = rank  # 向量排名
+                    ents.append(ent)
+                    query_ids.append(hit.id)
+                    # 对于COSINE相似度，score就是相似度值，可以直接使用
+                    query_distances.append(hit.score)
+            
+            if vector_similarity_threshold is not None:
+                logger.info(f"向量检索共{len(hits)}条结果，阈值过滤后剩余{len(ents)}条（阈值={vector_similarity_threshold}）")
+            else:
+                logger.info(f"向量检索共{len(hits)}条结果，未应用阈值过滤")
+            ids.append(query_ids)
+            distances.append(query_distances)
             entities.append(ents)
 
         ret_dic = {
@@ -747,6 +812,8 @@ def search_from_collection(tenant_code, org_code, collection_type, query_list, f
             "distances": distances,
             "entities": entities
         }
+        # 计算总结果数量
+        total_results = sum(len(e) for e in entities)
         logger.info(f'搜索结果: {json.dumps(ret_dic, ensure_ascii=False, indent=2)}')
-        logger.info(f'从全局向量库搜索完成，返回{len(ids)}个查询结果')
+        logger.info(f'从全局向量库搜索完成，{len(ids)}个查询，共返回{total_results}条结果')
         return ret_dic

@@ -1,8 +1,8 @@
 {
   "llm": {
-    "model": "qwen-max",
-    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    "api_key": "sk-5fcb8bf650804a4f8c1918dbb008d2ad"
+    "model": "Qwen2.5-72B-Instruct",
+    "base_url": "http://10.249.238.110:8009/v1",
+    "api_key": "EMPTY"
   },
   "milvus": {
     "host": "127.0.0.1",
@@ -37,11 +37,6 @@
     "default_use_hybrid": true,
     "rrf_k": 20
   },
-  "similarity_thresholds": {
-    "vector_similarity_threshold": 0.75,
-    "rrf_similarity_threshold": 0.085
-  },
-  "search_limit": 3,
   "embedding_model_path": "/workspace/embeddings/bge-large-zh-v1.5",
   "split": {
     "chunk_size": 2000,
@@ -50,8 +45,8 @@
   "mysql": {
     "host": "127.0.0.1",
     "port": 3306,
-    "user": "helper",
-    "password": "helper123",
+    "user": "admin",
+    "password": "admin123",
     "db_name": "ai_helper"
   },
   "ocr_service": {
@@ -64,7 +59,7 @@
     "access_key": "minioadmin",
     "secret_key": "minioadmin123",
     "secure": false,
-    "bucket_name": "aihelper-files",
+    "bucket_name": "forum-files",
     "base_url": "http://220.154.134.61:9000"
   }
 }

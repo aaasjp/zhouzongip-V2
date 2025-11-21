@@ -6,8 +6,8 @@
         <el-form-item label="租户代码">
           <el-input v-model="docForm.tenant_code" placeholder="请输入租户代码"></el-input>
         </el-form-item>
-        <el-form-item label="知识库名称">
-          <el-input v-model="docForm.org_code" placeholder="请输入知识库名称"></el-input>
+        <el-form-item label="部门代码">
+          <el-input v-model="docForm.org_code" placeholder="请输入部门代码"></el-input>
         </el-form-item>
         <el-form-item label="文档文件">
           <el-upload
@@ -36,8 +36,12 @@
         <el-form-item label="租户代码">
           <el-input v-model="qaForm.tenant_code" placeholder="请输入租户代码"></el-input>
         </el-form-item>
-        <el-form-item label="知识库名称">
-          <el-input v-model="qaForm.org_code" placeholder="请输入知识库名称"></el-input>
+        <el-form-item label="部门代码">
+          <el-input v-model="qaForm.org_code" placeholder="请输入部门代码"></el-input>
+        </el-form-item>
+        <el-form-item label="模板下载">
+          <el-button type="success" @click="downloadTemplate" :loading="templateDownloading">下载问答库模板</el-button>
+          <span style="margin-left: 10px; color: #909399; font-size: 12px;">请先下载模板，填写后上传</span>
         </el-form-item>
         <el-form-item label="问答对文件">
           <el-upload
@@ -66,8 +70,8 @@
         <el-form-item label="租户代码">
           <el-input v-model="searchForm.tenant_code" placeholder="请输入租户代码"></el-input>
         </el-form-item>
-        <el-form-item label="知识库名称">
-          <el-input v-model="searchForm.org_code" placeholder="请输入知识库名称"></el-input>
+        <el-form-item label="部门代码">
+          <el-input v-model="searchForm.org_code" placeholder="请输入部门代码"></el-input>
         </el-form-item>
         <el-form-item label="检索类型">
           <el-radio-group v-model="searchForm.collection_type">
@@ -102,7 +106,10 @@
           </div>
           <div style="margin-top: 5px; font-size: 12px; color: #909399;">
             <span>来源：{{ item.source || '未知' }}</span>
-            <span style="margin-left: 20px;">相似度：{{ (item.score || item.distance || 0).toFixed(4) }}</span>
+            <span style="margin-left: 20px;" v-if="item.bm25_rank !== undefined">BM25排名：{{ item.bm25_rank }}</span>
+            <span style="margin-left: 20px;" v-if="item.vector_rank !== undefined">向量排名：{{ item.vector_rank }}</span>
+            <span style="margin-left: 20px;" v-if="item.score !== undefined">向量相似度分数：{{ item.score.toFixed(4) }}</span>
+            <span style="margin-left: 20px;" v-if="item.rrf_score !== undefined">RRF分数：{{ item.rrf_score.toFixed(4) }}</span>
           </div>
         </div>
       </div>
@@ -130,6 +137,7 @@ export default {
         file: null
       },
       qaUploading: false,
+      templateDownloading: false,
       searchForm: {
         tenant_code: '',
         org_code: '',
@@ -150,10 +158,6 @@ export default {
       this.qaForm.file = file.raw
     },
     async uploadDocument() {
-      if (!this.docForm.tenant_code || !this.docForm.org_code) {
-        ElMessage.warning('请填写租户代码和知识库名称')
-        return
-      }
       if (!this.docForm.file) {
         ElMessage.warning('请选择文档文件')
         return
@@ -195,11 +199,45 @@ export default {
         this.docUploading = false
       }
     },
-    async uploadQA() {
-      if (!this.qaForm.tenant_code || !this.qaForm.org_code) {
-        ElMessage.warning('请填写租户代码和知识库名称')
-        return
+    async downloadTemplate() {
+      this.templateDownloading = true
+      try {
+        const response = await axios.get('/vector_db_service/download_qa_template', {
+          responseType: 'blob'
+        })
+        
+        // 创建下载链接
+        const url = window.URL.createObjectURL(new Blob([response.data]))
+        const link = document.createElement('a')
+        link.href = url
+        link.setAttribute('download', '问答库模板.xlsx')
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.URL.revokeObjectURL(url)
+        
+        ElMessage.success('模板下载成功')
+      } catch (error) {
+        if (error.response && error.response.data) {
+          // 尝试解析错误消息
+          const reader = new FileReader()
+          reader.onload = () => {
+            try {
+              const errorData = JSON.parse(reader.result)
+              ElMessage.error('下载失败：' + (errorData.msg || '未知错误'))
+            } catch {
+              ElMessage.error('下载失败：' + error.message)
+            }
+          }
+          reader.readAsText(error.response.data)
+        } else {
+          ElMessage.error('下载失败：' + error.message)
+        }
+      } finally {
+        this.templateDownloading = false
       }
+    },
+    async uploadQA() {
       if (!this.qaForm.file) {
         ElMessage.warning('请选择Excel文件')
         return
@@ -209,29 +247,19 @@ export default {
       try {
         const formData = new FormData()
         formData.append('file', this.qaForm.file)
+        formData.append('tenant_code', this.qaForm.tenant_code || '')
+        formData.append('org_code', this.qaForm.org_code || '')
         
-        const uploadRes = await axios.post('/chat_service/upload', formData, {
+        const addRes = await axios.post('/vector_db_service/add_qa_from_template', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
 
-        if (uploadRes.data.status === 'success') {
-          const fileUrl = uploadRes.data.data.file_url
-          
-          const addRes = await axios.post('/vector_db_service/add_qa_from_url', {
-            tenant_code: this.qaForm.tenant_code,
-            org_code: this.qaForm.org_code,
-            template_file_url: fileUrl
-          })
-
-          if (addRes.data.status === 'success') {
-            ElMessage.success('问答对上传成功：' + addRes.data.msg)
-            this.qaForm.file = null
-            this.$refs.qaUpload.clearFiles()
-          } else {
-            ElMessage.error('添加问答对失败：' + addRes.data.msg)
-          }
+        if (addRes.data.status === 'success') {
+          ElMessage.success('问答对上传成功：' + addRes.data.msg)
+          this.qaForm.file = null
+          this.$refs.qaUpload.clearFiles()
         } else {
-          ElMessage.error('文件上传失败：' + uploadRes.data.msg)
+          ElMessage.error('添加问答对失败：' + addRes.data.msg)
         }
       } catch (error) {
         ElMessage.error('上传失败：' + error.message)
@@ -240,10 +268,6 @@ export default {
       }
     },
     async searchVectorDB() {
-      if (!this.searchForm.tenant_code || !this.searchForm.org_code) {
-        ElMessage.warning('请填写租户代码和知识库名称')
-        return
-      }
       if (!this.searchForm.query) {
         ElMessage.warning('请输入查询内容')
         return

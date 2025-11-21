@@ -11,7 +11,7 @@ export default defineConfig({
         changeOrigin: true
       },
       '/chat_service': {
-        target: 'http://localhost:8006',
+        target: 'http://localhost:8005',
         changeOrigin: true
       }
     }

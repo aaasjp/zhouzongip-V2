@@ -6,7 +6,8 @@ import logging
 from typing import Optional, List, Dict, Any, Tuple
 from mysql_utils.mysql_helper import MySQLHelper
 
-logger = logging.getLogger(__name__)
+# 使用chat_service日志记录器
+logger = logging.getLogger('chat_service')
 
 
 class ChatService:
