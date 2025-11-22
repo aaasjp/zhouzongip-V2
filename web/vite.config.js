@@ -4,7 +4,7 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   server: {
-    port: 8080,
+    port: 8004,
     proxy: {
       '/vector_db_service': {
         target: 'http://localhost:8005',
