@@ -6,6 +6,7 @@ import logging
 import json
 import os
 import uuid
+import re
 from typing import Optional, List, Dict, Any, Generator, Tuple
 from flask import Blueprint, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
@@ -100,6 +101,48 @@ def truncate_text(text: str, max_length: int) -> str:
     if len(text) <= max_length:
         return text
     return text[:max_length]
+
+
+def simplify_question_title(question: str, max_length: int = 20) -> str:
+    """精简用户问题作为标题
+    1. 去除标点符号
+    2. 去除语气词（如：的、了、呢、吗、啊、呀、吧、哦等）
+    3. 保留前N个字符（默认20字）
+    """
+    if not question:
+        return ""
+    
+    # 去除标点符号（保留中文字符、数字、字母、空格）
+    text = re.sub(r'[^\w\s\u4e00-\u9fff]', '', question)
+    
+    # 去除常见的语气词和助词（只过滤真正的语气词，保留有意义的实词）
+    stop_words = ['的', '了', '呢', '吗', '啊', '呀', '吧', '哦', '嗯', '呃', '哈', '啦', 
+                  '嘛', '哟', '诶', '唉', '哎', '喂', '嘿', '嗨', '额']
+    
+    # 按字符分割，过滤语气词
+    chars = list(text)
+    filtered_chars = [char for char in chars if char not in stop_words]
+    text = ''.join(filtered_chars)
+    
+    # 去除多余空格并合并
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # 如果处理后为空，使用原问题（去除标点）作为后备
+    if not text:
+        text = re.sub(r'[^\w\s\u4e00-\u9fff]', '', question)
+        text = re.sub(r'\s+', ' ', text).strip()
+    
+    # 截断到指定长度（按字符数，不是字节数）
+    if len(text) > max_length:
+        text = text[:max_length]
+    
+    # 如果仍然为空，使用原问题的前max_length个字符（去除标点）
+    if not text:
+        text = re.sub(r'[^\w\s\u4e00-\u9fff]', '', question)
+        text = re.sub(r'\s+', ' ', text).strip()
+        text = text[:max_length] if text else question[:max_length]
+    
+    return text
 
 
 def limit_input_length(system_prompt: str, question: str, history: List[Tuple[str, str]], max_chars: int = 8192) -> Tuple[str, str, List[Tuple[str, str]]]:
@@ -214,6 +257,16 @@ def chat():
     is_succ, msg = chat_service.save_message(session_id, user_id, 'user', question)
     if not is_succ:
         logger.warning(f"保存用户消息失败: {msg}，session_id={session_id}, user_id={user_id}")
+    
+    # 如果session的title为"新对话"，则更新为用户第一条消息的精简版本
+    if session and session.get('title') == '新对话':
+        simplified_title = simplify_question_title(question, max_length=20)
+        if simplified_title:
+            is_succ, msg = chat_service.update_session_title(session_id, simplified_title)
+            if is_succ:
+                logger.info(f"自动更新会话标题: session_id={session_id}, title={simplified_title}")
+            else:
+                logger.warning(f"更新会话标题失败: {msg}，session_id={session_id}")
     
     # 获取对话历史
     history = chat_service.get_conversation_history(session_id)
