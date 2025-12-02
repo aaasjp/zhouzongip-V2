@@ -1,7 +1,7 @@
 {
   "name": "ai-helper-web",
   "version": "1.0.0",
-  "description": "AI助手管理平台前端",
+  "description": "知识库管理平台前端",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

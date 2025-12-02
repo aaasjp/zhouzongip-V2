@@ -1,7 +1,7 @@
 <template>
   <div class="container">
     <div class="header">
-      <h1>AI助手管理平台</h1>
+      <h1>知识库管理平台</h1>
     </div>
     
     <div class="tabs">
