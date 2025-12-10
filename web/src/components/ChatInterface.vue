@@ -107,8 +107,20 @@
                 size="small"
               />
             </el-form-item>
+            <el-form-item label="对话模式">
+              <el-select 
+                v-model="chatForm.prompt_type" 
+                placeholder="请选择" 
+                style="width: 150px;"
+                size="small"
+              >
+                <el-option label="普通对话" value="" />
+                <el-option label="创意生成" value="idea_gen" />
+                <el-option label="脚本生成" value="scripts_gen" />
+              </el-select>
+            </el-form-item>
             <el-form-item>
-              <el-checkbox v-model="chatForm.use_vector_db" size="small">使用向量库</el-checkbox>
+              <el-checkbox v-model="chatForm.use_vector_db" size="small">使用素材库</el-checkbox>
               <el-checkbox v-model="chatForm.stream" size="small">流式输出</el-checkbox>
             </el-form-item>
           </el-form>
@@ -180,7 +192,8 @@ export default {
         question: '',
         use_vector_db: true,
         stream: true,
-        session_id: ''
+        session_id: '',
+        prompt_type: '' // 对话模式：''普通对话, 'idea_gen'创意生成, 'scripts_gen'脚本生成
       },
       chatting: false,
       streaming: false,
@@ -449,7 +462,8 @@ export default {
           use_vector_db: this.chatForm.use_vector_db && uploadedDocs.length === 0,
           uploaded_docs: uploadedDocs,
           stream: true,
-          limit: 5
+          limit: 5,
+          prompt_type: this.chatForm.prompt_type || ''
         })
       })
 
@@ -508,7 +522,8 @@ export default {
         use_vector_db: this.chatForm.use_vector_db && uploadedDocs.length === 0,
         uploaded_docs: uploadedDocs,
         stream: false,
-        limit: 5
+        limit: 5,
+        prompt_type: this.chatForm.prompt_type || ''
       })
 
       if (res.data.status === 'success') {

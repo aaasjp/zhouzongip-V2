@@ -1,16 +1,16 @@
 <template>
   <div class="container">
     <div class="header">
-      <h1>知识库管理平台</h1>
+      <h1>高管IP管理平台</h1>
     </div>
     
     <div class="tabs">
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
-        <el-tab-pane label="向量库管理" name="vector">
+        <el-tab-pane label="素材库管理" name="vector">
           <VectorManagement />
         </el-tab-pane>
 
-        <el-tab-pane label="对话问答" name="chat">
+        <el-tab-pane label="高管IP助手" name="chat">
           <ChatInterface />
         </el-tab-pane>
       </el-tabs>

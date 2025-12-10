@@ -1,7 +1,7 @@
 import logging
 from config.log_config import setup_vector_db_logging
 
-# 配置向量库服务日志
+# 配置素材库服务日志
 setup_vector_db_logging()
 logger = logging.getLogger('vector_db')
 
@@ -38,9 +38,9 @@ def new_collection():
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
     except Exception as e:
         import traceback
-        logger.exception(f"创建全局向量库异常: {traceback.format_exc()}")
+        logger.exception(f"创建全局素材库异常: {traceback.format_exc()}")
         return jsonify({'status': 'fail', 'msg': traceback.format_exc(), 'code': 400})
-    return jsonify({'status': 'success', 'code': 200, 'msg': '成功创建全局向量库', 'data': ''})
+    return jsonify({'status': 'success', 'code': 200, 'msg': '成功创建全局素材库', 'data': ''})
 
 
 @vector_db_bp.route('/vector_db_service/del_collection', methods=['POST'])
@@ -57,9 +57,9 @@ def del_collection():
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
     except Exception:
         import traceback
-        logger.exception(f"删除向量库数据异常: {traceback.format_exc()}")
+        logger.exception(f"删除素材库数据异常: {traceback.format_exc()}")
         return jsonify({'status': 'fail', 'msg': traceback.format_exc(), 'code': 400})
-    return jsonify({'status': 'success', 'code': 200, 'msg': '成功删除向量库数据', 'data': ''})
+    return jsonify({'status': 'success', 'code': 200, 'msg': '成功删除素材库数据', 'data': ''})
 
 
 # ==================== 文档相关接口 ====================
@@ -101,9 +101,9 @@ def add_document():
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
     except Exception:
         import traceback
-        logger.exception(f"插入文档到向量库异常: {traceback.format_exc()}")
+        logger.exception(f"插入文档到素材库异常: {traceback.format_exc()}")
         return jsonify({'status': 'fail', 'msg': traceback.format_exc(), 'code': 400})
-    return jsonify({'status': 'success', 'code': 200, 'msg': '成功插入文档到向量库', 'data': ''})
+    return jsonify({'status': 'success', 'code': 200, 'msg': '成功插入文档到素材库', 'data': ''})
 
 
 @vector_db_bp.route('/vector_db_service/add_multi_document', methods=['POST'])
@@ -163,20 +163,20 @@ def add_multi_document():
                                                      doc_content_list=[content], source_list=[doc_url],
                                                      metadata_list=[{}])
             if not is_succ:
-                logger.error(f"插入文档[{doc_url}]到向量库失败:{msg}")
+                logger.error(f"插入文档[{doc_url}]到素材库失败:{msg}")
                 failed_count += 1
                 continue
             success_count += 1
         except Exception:
             import traceback
-            logger.exception(f"插入文档[{doc_url}]到向量库异常: {traceback.format_exc()}")
+            logger.exception(f"插入文档[{doc_url}]到素材库异常: {traceback.format_exc()}")
             failed_count += 1
             continue
     
     if failed_count > 0:
         return jsonify({'status': 'fail', 'code': 400,
-                        'msg': f'插入文档到向量库：成功[{success_count}]个,失败[{failed_count}]个', 'data': ''})
-    return jsonify({'status': 'success', 'code': 200, 'msg': f'插入文档到向量库成功', 'data': ''})
+                        'msg': f'插入文档到素材库：成功[{success_count}]个,失败[{failed_count}]个', 'data': ''})
+    return jsonify({'status': 'success', 'code': 200, 'msg': f'插入文档到素材库成功', 'data': ''})
 
 
 @vector_db_bp.route('/vector_db_service/del_document', methods=['POST'])
@@ -198,15 +198,15 @@ def del_document():
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
     except Exception:
         import traceback
-        logger.exception(f"从全局向量库删除文档异常: {traceback.format_exc()}")
+        logger.exception(f"从全局素材库删除文档异常: {traceback.format_exc()}")
         return jsonify({'status': 'fail', 'msg': traceback.format_exc(), 'code': 400})
-    return jsonify({'status': 'success', 'code': 200, 'msg': '从全局向量库删除文档成功', 'data': ''})
+    return jsonify({'status': 'success', 'code': 200, 'msg': '从全局素材库删除文档成功', 'data': ''})
 
 
 @vector_db_bp.route('/vector_db_service/search_from_vector_db', methods=['POST'])
 def search_from_vector_db():
     data = request.get_json()
-    logger.info(f'从向量库搜索，请求参数: tenant_code={data.get("tenant_code", "")}, org_code={data.get("org_code", "")}, query={data.get("query", "")[:100]}..., collection_type={data.get("collection_type", "")}, limit={data.get("limit", 5)}, use_hybrid={data.get("use_hybrid", False)}')
+    logger.info(f'从素材库搜索，请求参数: tenant_code={data.get("tenant_code", "")}, org_code={data.get("org_code", "")}, query={data.get("query", "")[:100]}..., collection_type={data.get("collection_type", "")}, limit={data.get("limit", 5)}, use_hybrid={data.get("use_hybrid", False)}')
     tenant_code = data.get('tenant_code', '')
     org_code = data.get('org_code', '')
     query = data.get('query', '')
@@ -214,7 +214,7 @@ def search_from_vector_db():
     filter_expr = data.get('filter_expr', '')
     limit = data.get('limit', 5)  # 接口默认limit为5，不使用配置中的search_limit
     use_hybrid = data.get('use_hybrid', False)  # 是否使用混合检索，默认False
-    # 向量库服务接口可以传递阈值，如果不传则使用None（不进行阈值过滤）
+    # 素材库服务接口可以传递阈值，如果不传则使用None（不进行阈值过滤）
     vector_similarity_threshold = data.get('vector_similarity_threshold', None)
     rrf_similarity_threshold = data.get('rrf_similarity_threshold', None)
 
@@ -224,12 +224,12 @@ def search_from_vector_db():
     if not collection_type:
         return jsonify({'status': 'fail', 'msg': 'collect_type不能为空', 'code': 400, 'data': ''})
 
-    # 根据 collection_type 获取对应的向量库名称
+    # 根据 collection_type 获取对应的素材库名称
     name_convention = config.get('name_convention', {})
     if collection_type == 'DOC':
-        collection_name = name_convention.get('global_collection_doc', '全局文档向量库')
+        collection_name = name_convention.get('global_collection_doc', '全局文档素材库')
     else:  # QA
-        collection_name = name_convention.get('global_collection_qa', '全局QA向量库')
+        collection_name = name_convention.get('global_collection_qa', '全局QA素材库')
 
     try:
         res = search_from_collection(tenant_code=tenant_code, org_code=org_code,
@@ -238,12 +238,12 @@ def search_from_vector_db():
                                      vector_similarity_threshold=vector_similarity_threshold,
                                      rrf_similarity_threshold=rrf_similarity_threshold)
 
-        logger.info(f"从向量库[{collection_name}]查询成功，使用混合检索: {use_hybrid}")
+        logger.info(f"从素材库[{collection_name}]查询成功，使用混合检索: {use_hybrid}")
     except Exception:
         import traceback
-        logger.exception(f"从向量库[{collection_name}]查询异常: {traceback.format_exc()}")
+        logger.exception(f"从素材库[{collection_name}]查询异常: {traceback.format_exc()}")
         return jsonify({'status': 'fail', 'msg': traceback.format_exc(), 'code': 400})
-    return jsonify({'status': 'success', 'code': 200, 'msg': '从向量库查询成功', 'data': res})
+    return jsonify({'status': 'success', 'code': 200, 'msg': '从素材库查询成功', 'data': res})
 
 
 # ==================== 问答对相关接口 ====================
@@ -321,9 +321,9 @@ def add_qa():
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
     except Exception:
         import traceback
-        logger.exception(f"插入向量库异常: {traceback.format_exc()}")
+        logger.exception(f"插入素材库异常: {traceback.format_exc()}")
         return jsonify({'status': 'fail', 'msg': traceback.format_exc(), 'code': 400})
-    return jsonify({'status': 'success', 'code': 200, 'msg': f'成功插入{len(question_list)}条问答对到向量库', 'data': ''})
+    return jsonify({'status': 'success', 'code': 200, 'msg': f'成功插入{len(question_list)}条问答对到素材库', 'data': ''})
 
 
 @vector_db_bp.route('/vector_db_service/add_qa_from_template', methods=['POST'])
@@ -356,19 +356,19 @@ def add_qa_from_template():
         question_list, answers_list, source_list = load_qa_template(temp_file_path)
         metadata_list = [{} for q in question_list]
         
-        # 插入到向量库
+        # 插入到素材库
         is_succ, msg = insert_qa_to_collection(tenant_code, org_code, question_list=question_list,
                                                answer_list=answers_list, source_list=source_list,
                                                metadata_list=metadata_list)
         if not is_succ:
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
         
-        logger.info(f"成功从上传文件添加{len(question_list)}条问答对到向量库")
-        return jsonify({'status': 'success', 'code': 200, 'msg': f'成功插入{len(question_list)}条问答对到向量库', 'data': ''})
+        logger.info(f"成功从上传文件添加{len(question_list)}条问答对到素材库")
+        return jsonify({'status': 'success', 'code': 200, 'msg': f'成功插入{len(question_list)}条问答对到素材库', 'data': ''})
         
     except Exception as e:
         import traceback
-        logger.exception(f"从上传文件添加问答对到向量库异常: {traceback.format_exc()}")
+        logger.exception(f"从上传文件添加问答对到素材库异常: {traceback.format_exc()}")
         return jsonify({'status': 'fail', 'msg': traceback.format_exc(), 'code': 400})
     finally:
         # 清理临时文件
@@ -399,6 +399,6 @@ def del_qa():
             return jsonify({'status': 'fail', 'msg': msg, 'code': 400, 'data': ''})
     except Exception:
         import traceback
-        logger.exception(f"从全局向量库删除问答对异常: {traceback.format_exc()}")
+        logger.exception(f"从全局素材库删除问答对异常: {traceback.format_exc()}")
         return jsonify({'status': 'fail', 'msg': traceback.format_exc(), 'code': 400})
-    return jsonify({'status': 'success', 'code': 200, 'msg': '从全局向量库删除问答对成功', 'data': ''})
+    return jsonify({'status': 'success', 'code': 200, 'msg': '从全局素材库删除问答对成功', 'data': ''})

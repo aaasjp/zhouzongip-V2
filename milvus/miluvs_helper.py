@@ -94,8 +94,8 @@ def ensure_index_exists(collection, field_name, index_params):
 
 
 def create_collection():
-    """创建全局向量库和两个全局collection（如果不存在）"""
-    logger.info(f"调用方法:create_collection，创建全局向量库和collection")
+    """创建全局素材库和两个全局collection（如果不存在）"""
+    logger.info(f"调用方法:create_collection，创建全局素材库和collection")
 
     config_milvus_dic = config['milvus']
     index_params = config['index_params']
@@ -122,14 +122,14 @@ def create_collection():
         collection.create_index(field_name="tenant_code", index_params=varchar_index_params)
         collection.create_index(field_name="org_code", index_params=varchar_index_params)
         collection.load()
-        logger.info(f"全局向量库[{global_collection_qa_name}]创建成功，已为embedding、tenant_code、org_code字段创建索引")
+        logger.info(f"全局素材库[{global_collection_qa_name}]创建成功，已为embedding、tenant_code、org_code字段创建索引")
     else:
         # collection已存在，检查并创建缺失的索引
         collection = Collection(global_collection_qa_name)
         ensure_index_exists(collection, "embedding", index_params)
         ensure_index_exists(collection, "tenant_code", varchar_index_params)
         ensure_index_exists(collection, "org_code", varchar_index_params)
-        logger.info(f"全局向量库[{global_collection_qa_name}]已存在，已确保所有索引存在")
+        logger.info(f"全局素材库[{global_collection_qa_name}]已存在，已确保所有索引存在")
     
     # 创建全局DOC collection（如果不存在）
     if global_collection_doc_name not in exist_collection_list:
@@ -140,17 +140,17 @@ def create_collection():
         collection.create_index(field_name="tenant_code", index_params=varchar_index_params)
         collection.create_index(field_name="org_code", index_params=varchar_index_params)
         collection.load()
-        logger.info(f"全局向量库[{global_collection_doc_name}]创建成功，已为embedding、tenant_code、org_code字段创建索引")
+        logger.info(f"全局素材库[{global_collection_doc_name}]创建成功，已为embedding、tenant_code、org_code字段创建索引")
     else:
         # collection已存在，检查并创建缺失的索引
         collection = Collection(global_collection_doc_name)
         ensure_index_exists(collection, "embedding", index_params)
         ensure_index_exists(collection, "tenant_code", varchar_index_params)
         ensure_index_exists(collection, "org_code", varchar_index_params)
-        logger.info(f"全局向量库[{global_collection_doc_name}]已存在，已确保所有索引存在")
+        logger.info(f"全局素材库[{global_collection_doc_name}]已存在，已确保所有索引存在")
 
-    logger.info(f"全局向量库和collection初始化完成")
-    return True, f"全局向量库和collection初始化完成"
+    logger.info(f"全局素材库和collection初始化完成")
+    return True, f"全局素材库和collection初始化完成"
 
 
 def delete_collection(tenant_code=None, org_code=None):
@@ -164,12 +164,12 @@ def delete_collection(tenant_code=None, org_code=None):
     exist_collection_list = utility.list_collections()
 
     if global_collection_qa_name not in exist_collection_list:
-        logger.error(f"全局向量库[{global_collection_qa_name}]不存在")
-        return False, f"全局向量库[{global_collection_qa_name}]不存在"
+        logger.error(f"全局素材库[{global_collection_qa_name}]不存在")
+        return False, f"全局素材库[{global_collection_qa_name}]不存在"
 
     if global_collection_doc_name not in exist_collection_list:
-        logger.error(f"全局向量库[{global_collection_doc_name}]不存在")
-        return False, f"全局向量库[{global_collection_doc_name}]不存在"
+        logger.error(f"全局素材库[{global_collection_doc_name}]不存在")
+        return False, f"全局素材库[{global_collection_doc_name}]不存在"
 
     # 构建过滤表达式
     filter_expr = ""
@@ -186,18 +186,18 @@ def delete_collection(tenant_code=None, org_code=None):
         qa_collection = Collection(global_collection_qa_name)
         qa_collection.delete(filter_expr)
         qa_collection.flush()
-        logger.info(f"从全局QA向量库删除数据，过滤条件: {filter_expr}")
+        logger.info(f"从全局QA素材库删除数据，过滤条件: {filter_expr}")
 
         # 删除DOC collection中的数据
         doc_collection = Collection(global_collection_doc_name)
         doc_collection.delete(filter_expr)
         doc_collection.flush()
-        logger.info(f"从全局DOC向量库删除数据，过滤条件: {filter_expr}")
+        logger.info(f"从全局DOC素材库删除数据，过滤条件: {filter_expr}")
     else:
         logger.warning("未提供tenant_code或org_code，无法删除数据")
 
-    logger.info(f"从全局向量库删除数据成功")
-    return True, f"从全局向量库删除数据成功"
+    logger.info(f"从全局素材库删除数据成功")
+    return True, f"从全局素材库删除数据成功"
 
 
 def insert_qa_to_collection(tenant_code, org_code, question_list, answer_list, source_list, metadata_list):
@@ -212,8 +212,8 @@ def insert_qa_to_collection(tenant_code, org_code, question_list, answer_list, s
     exist_collection_list = utility.list_collections()
     
     if global_collection_qa_name not in exist_collection_list:
-        logger.error(f"全局向量库[{global_collection_qa_name}]不存在，请先创建")
-        return False, f"全局向量库[{global_collection_qa_name}]不存在，请先创建"
+        logger.error(f"全局素材库[{global_collection_qa_name}]不存在，请先创建")
+        return False, f"全局素材库[{global_collection_qa_name}]不存在，请先创建"
 
     collection = Collection(name=global_collection_qa_name)
 
@@ -263,30 +263,9 @@ def insert_qa_to_collection(tenant_code, org_code, question_list, answer_list, s
             tenant_code_list, org_code_list, question_embeddings, metadata_list]
     collection.insert(data=data)
     collection.flush()
-    logger.info(f'插入全局向量库[{global_collection_qa_name}]成功，新增问答对{len(question_list)}条，其中{exist_quest_count}条是删除后重新插入的')
+    logger.info(f'插入全局素材库[{global_collection_qa_name}]成功，新增问答对{len(question_list)}条，其中{exist_quest_count}条是删除后重新插入的')
 
-    return True, f"插入全局向量库成功，新增问答对{len(question_list)}条，其中{exist_quest_count}条是删除后重新插入的"
-
-
-def upsert_qa_to_collection(tenant_code, org_code, question_list, answer_list, source_list, metadata_list):
-    """更新QA到全局collection（先删除后插入），org_code就是org_code"""
-    logger.info(f"调用方法:upsert_qa_to_collection，参数为:tenant_code={tenant_code}, org_code={org_code}, 问答对数量={len(question_list)}")
-
-    # 先删除已存在的问答对
-    is_succ, msg = delete_qa_from_collection(tenant_code, org_code, question_list)
-    if not is_succ:
-        logger.error(f"更新问答对:先删除已存在的问答对出错:{msg}")
-        return False, f"更新问答对:先删除已存在的问答对出错:{msg}"
-
-    # 再插入新的问答对
-    is_succ, msg = insert_qa_to_collection(tenant_code, org_code, question_list, answer_list, source_list,
-                                           metadata_list)
-    if not is_succ:
-        logger.error(f"更新问答对：删除之后插入问答对出错:{msg}")
-        return False, f"更新问答对：删除之后插入问答对出错:{msg}"
-
-    logger.info(f'更新问答对到全局向量库成功')
-    return True, f'更新问答对到全局向量库成功'
+    return True, f"插入全局素材库成功，新增问答对{len(question_list)}条，其中{exist_quest_count}条是删除后重新插入的"
 
 
 def insert_docs_to_collection(tenant_code, org_code, doc_name_list, doc_content_list, source_list,
@@ -302,8 +281,8 @@ def insert_docs_to_collection(tenant_code, org_code, doc_name_list, doc_content_
     exist_collection_list = utility.list_collections()
     
     if global_collection_doc_name not in exist_collection_list:
-        logger.error(f"全局向量库[{global_collection_doc_name}]不存在，请先创建")
-        return False, f"全局向量库[{global_collection_doc_name}]不存在，请先创建"
+        logger.error(f"全局素材库[{global_collection_doc_name}]不存在，请先创建")
+        return False, f"全局素材库[{global_collection_doc_name}]不存在，请先创建"
 
     collection = Collection(name=global_collection_doc_name)
 
@@ -382,9 +361,9 @@ def insert_docs_to_collection(tenant_code, org_code, doc_name_list, doc_content_
             tenant_code_list, org_code_list, block_embeddings, new_metadata_list]
     collection.insert(data=data)
     collection.flush()
-    logger.info(f"插入docs到全局向量库[{global_collection_doc_name}]成功,新增文档{len(doc_name_list)}条，已经存在而无需新增的文档{exist_doc_count}条，共插入{len(new_doc_content_block_list)}个文档块")
+    logger.info(f"插入docs到全局素材库[{global_collection_doc_name}]成功,新增文档{len(doc_name_list)}条，已经存在而无需新增的文档{exist_doc_count}条，共插入{len(new_doc_content_block_list)}个文档块")
     
-    return True, f"插入docs到全局向量库成功,新增文档{len(doc_name_list)}条，已经存在而无需新增的文档{exist_doc_count}条"
+    return True, f"插入docs到全局素材库成功,新增文档{len(doc_name_list)}条，已经存在而无需新增的文档{exist_doc_count}条"
 
 
 def delete_qa_from_collection(tenant_code, org_code, question_list):
@@ -399,8 +378,8 @@ def delete_qa_from_collection(tenant_code, org_code, question_list):
     exist_collection_list = utility.list_collections()
     
     if global_collection_qa_name not in exist_collection_list:
-        logger.error(f"全局向量库[{global_collection_qa_name}]不存在")
-        return False, f"全局向量库[{global_collection_qa_name}]不存在"
+        logger.error(f"全局素材库[{global_collection_qa_name}]不存在")
+        return False, f"全局素材库[{global_collection_qa_name}]不存在"
 
     collection = Collection(global_collection_qa_name)
     
@@ -419,8 +398,8 @@ def delete_qa_from_collection(tenant_code, org_code, question_list):
         collection.delete(filter_expr)
     collection.flush()
 
-    logger.info(f"从全局向量库[{global_collection_qa_name}]删除问答对成功，共删除{len(question_list)}条")
-    return True, f"从全局向量库删除问答对成功"
+    logger.info(f"从全局素材库[{global_collection_qa_name}]删除问答对成功，共删除{len(question_list)}条")
+    return True, f"从全局素材库删除问答对成功"
 
 
 def delete_docs_from_collection(tenant_code, org_code, doc_name_list):
@@ -435,8 +414,8 @@ def delete_docs_from_collection(tenant_code, org_code, doc_name_list):
     exist_collection_list = utility.list_collections()
     
     if global_collection_doc_name not in exist_collection_list:
-        logger.error(f"全局向量库[{global_collection_doc_name}]不存在")
-        return False, f"全局向量库[{global_collection_doc_name}]不存在"
+        logger.error(f"全局素材库[{global_collection_doc_name}]不存在")
+        return False, f"全局素材库[{global_collection_doc_name}]不存在"
 
     collection = Collection(global_collection_doc_name)
     
@@ -455,8 +434,8 @@ def delete_docs_from_collection(tenant_code, org_code, doc_name_list):
         collection.delete(filter_expr)
     collection.flush()
 
-    logger.info(f"从全局向量库[{global_collection_doc_name}]删除文档成功，共删除{len(doc_name_list)}个文档")
-    return True, f"从全局向量库删除文档成功"
+    logger.info(f"从全局素材库[{global_collection_doc_name}]删除文档成功，共删除{len(doc_name_list)}个文档")
+    return True, f"从全局素材库删除文档成功"
 
 
 def _tokenize_chinese(text):
@@ -650,13 +629,13 @@ def search_from_collection(tenant_code, org_code, collection_type, query_list, f
 
     if collection_type == 'QA':
         if global_collection_qa_name not in exist_collection_list:
-            logger.error(f"全局向量库[{global_collection_qa_name}]不存在")
-            return False, f"全局向量库[{global_collection_qa_name}]不存在"
+            logger.error(f"全局素材库[{global_collection_qa_name}]不存在")
+            return False, f"全局素材库[{global_collection_qa_name}]不存在"
         collection = Collection(global_collection_qa_name)
     else:
         if global_collection_doc_name not in exist_collection_list:
-            logger.error(f"全局向量库[{global_collection_doc_name}]不存在")
-            return False, f"全局向量库[{global_collection_doc_name}]不存在"
+            logger.error(f"全局素材库[{global_collection_doc_name}]不存在")
+            return False, f"全局素材库[{global_collection_doc_name}]不存在"
         collection = Collection(global_collection_doc_name)
 
     # 构建过滤表达式
@@ -815,5 +794,5 @@ def search_from_collection(tenant_code, org_code, collection_type, query_list, f
         # 计算总结果数量
         total_results = sum(len(e) for e in entities)
         logger.info(f'搜索结果: {json.dumps(ret_dic, ensure_ascii=False, indent=2)}')
-        logger.info(f'从全局向量库搜索完成，{len(ids)}个查询，共返回{total_results}条结果')
+        logger.info(f'从全局素材库搜索完成，{len(ids)}个查询，共返回{total_results}条结果')
         return ret_dic

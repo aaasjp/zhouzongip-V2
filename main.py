@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 AI助手主服务
-合并向量数据库服务和对话问答服务到一个服务
+合并向量数据库服务和高管IP助手服务到一个服务
 """
 import logging
 import json
@@ -34,17 +34,17 @@ def main():
     # 配置 JSON 编码器，确保中文字符不被转义
     app.json.ensure_ascii = False
     
-    # 初始化向量库（如果需要）
+    # 初始化素材库（如果需要）
     try:
-        logger.info("初始化向量库...")
+        logger.info("初始化素材库...")
         from milvus.miluvs_helper import create_collection
         is_succ, msg = create_collection()
         if is_succ:
-            logger.info(f"向量库初始化成功: {msg}")
+            logger.info(f"素材库初始化成功: {msg}")
         else:
-            logger.warning(f"向量库初始化失败: {msg}")
+            logger.warning(f"素材库初始化失败: {msg}")
     except Exception as e:
-        logger.warning(f"向量库初始化异常（可能已存在）: {e}")
+        logger.warning(f"素材库初始化异常（可能已存在）: {e}")
     
     # 初始化MySQL表（如果需要）
     try:
@@ -60,13 +60,13 @@ def main():
     except Exception as e:
         logger.warning(f"MySQL表初始化异常: {e}")
     
-    # 注册向量库服务 Blueprint
+    # 注册素材库服务 Blueprint
     try:
         from vector_db_server import vector_db_bp
         app.register_blueprint(vector_db_bp)
-        logger.info("向量库服务路由已注册")
+        logger.info("素材库服务路由已注册")
     except Exception as e:
-        logger.error(f"注册向量库服务路由失败: {e}")
+        logger.error(f"注册素材库服务路由失败: {e}")
         import traceback
         logger.exception(traceback.format_exc())
         return
@@ -91,7 +91,7 @@ def main():
     
     logger.info("=" * 60)
     logger.info(f"所有服务已启动，监听地址: {host}:{port}")
-    logger.info("向量库服务接口: /vector_db_service/*")
+    logger.info("素材库服务接口: /vector_db_service/*")
     logger.info("对话服务接口: /chat_service/*")
     logger.info("=" * 60)
     

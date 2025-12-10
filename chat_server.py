@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-对话问答服务
+高管IP助手服务
 """
 import logging
 import json
@@ -17,6 +17,8 @@ from utils.file_loader import extract_content_from_file
 from chat.chat_service import ChatService
 from minio_utils.minio_client import upload_file
 from config.log_config import setup_chat_service_logging
+from prompts.idea_gen import idea_gen_prompt
+from prompts.scripts_gen import scripts_gen_prompt
 
 # 配置对话服务日志
 setup_chat_service_logging()
@@ -208,12 +210,13 @@ def chat():
     - question: 用户问题（必填）
     - tenant_code: 租户代码（可选）
     - org_code: 组织代码（可选）
-    - use_vector_db: 是否使用向量库（默认true）
+    - use_vector_db: 是否使用素材库（默认true）
     - uploaded_docs: 上传的文档列表（支持多个文档），格式：[{file_name, file_url, content, parse_success}]
       - file_url: 文档URL（用于展示文档来源）
       - content: 文档内容（用于问答）
     - stream: 是否流式输出（默认true）
     - limit: 检索结果数量（默认5）
+    - prompt_type: 对话模式（可选），''普通对话, 'idea_gen'创意生成, 'scripts_gen'脚本生成
     """
     data = request.get_json()
     user_id = data.get('user_id', '')
@@ -232,6 +235,7 @@ def chat():
         uploaded_docs = []
     stream = data.get('stream', True)
     limit = data.get('limit', config.get('search_limit', 3))  # 默认从配置文件读取
+    prompt_type = data.get('prompt_type', '')  # 对话模式：''普通对话, 'idea_gen'创意生成, 'scripts_gen'脚本生成
     
     # 参数验证
     if not user_id:
@@ -311,7 +315,7 @@ def chat():
         except Exception as e:
             logger.error(f"处理上传文档失败: {e}，uploaded_docs={uploaded_docs}")
     
-    # 如果使用向量库检索（且没有使用上传文档）
+    # 如果使用素材库检索（且没有使用上传文档）
     elif use_vector_db and not (uploaded_docs and len(uploaded_docs) > 0):
         try:
             # 构建过滤表达式
@@ -328,7 +332,7 @@ def chat():
             vector_similarity_threshold = similarity_thresholds.get('vector_similarity_threshold', 0.75)
             rrf_similarity_threshold = similarity_thresholds.get('rrf_similarity_threshold', 0.85)
             
-            # 只搜索DOC集合（不传tenant_code和org_code则使用全部向量知识库）
+            # 只搜索DOC集合（不传tenant_code和org_code则使用全部向量素材库）
             doc_results = search_from_collection(
                 tenant_code=tenant_code if tenant_code else '',
                 org_code=org_code if org_code else '',
@@ -361,17 +365,23 @@ def chat():
                         context_texts.append(f"文档内容：{entity.get('content', '')}")
                 
                 if context_texts:
-                    context_parts.append("参考知识库内容：\n" + "\n\n".join(context_texts))
+                    context_parts.append("参考素材库内容：\n" + "\n\n".join(context_texts))
         
         except Exception as e:
-            logger.error(f"向量库检索失败: {e}，tenant_code={tenant_code}, org_code={org_code}, query={question[:100]}")
+            logger.error(f"素材库检索失败: {e}，tenant_code={tenant_code}, org_code={org_code}, query={question[:100]}")
             import traceback
-            logger.exception(f"向量库检索异常详情: {traceback.format_exc()}")
+            logger.exception(f"素材库检索异常详情: {traceback.format_exc()}")
     
     # 构建系统提示词
-    system_prompt = """你是一个专业的AI助手，能够基于提供的知识库内容回答用户问题。
-如果知识库中有相关内容，请基于知识库内容回答；如果没有相关内容，可以使用你的通用知识回答。
+    system_prompt = """你是一个专业的AI助手，能够基于提供的素材库内容回答用户问题。
+如果素材库中有相关内容，请基于素材库内容回答；如果没有相关内容，可以使用你的通用知识回答。
 回答要准确、简洁、有条理。"""
+    
+    # 根据prompt_type添加相应的prompt
+    if prompt_type == 'idea_gen':
+        system_prompt += "\n\n" + idea_gen_prompt
+    elif prompt_type == 'scripts_gen':
+        system_prompt += "\n\n" + scripts_gen_prompt
     
     if context_parts:
         system_prompt += "\n\n" + "\n\n".join(context_parts)

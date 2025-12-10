@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="upload-section">
-      <h3>上传文档到向量库</h3>
+      <h3>上传文档到素材库</h3>
       <el-form :model="docForm" label-width="120px" style="margin-top: 20px;">
         <el-form-item label="租户代码">
           <el-input v-model="docForm.tenant_code" placeholder="请输入租户代码"></el-input>
@@ -31,7 +31,7 @@
     <el-divider></el-divider>
 
     <div class="upload-section">
-      <h3>上传问答对到向量库</h3>
+      <h3>上传问答对到素材库</h3>
       <el-form :model="qaForm" label-width="120px" style="margin-top: 20px;">
         <el-form-item label="租户代码">
           <el-input v-model="qaForm.tenant_code" placeholder="请输入租户代码"></el-input>
@@ -65,7 +65,7 @@
     <el-divider></el-divider>
 
     <div class="search-section">
-      <h3>向量库检索</h3>
+      <h3>素材库检索</h3>
       <el-form :model="searchForm" label-width="120px" style="margin-top: 20px;">
         <el-form-item label="租户代码">
           <el-input v-model="searchForm.tenant_code" placeholder="请输入租户代码"></el-input>

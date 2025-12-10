@@ -67,7 +67,7 @@ def setup_logging(service_name='vector_db', log_file='logs/vector_db_server.log'
 
 
 def setup_vector_db_logging():
-    """配置向量库服务的日志"""
+    """配置素材库服务的日志"""
     return setup_logging(
         service_name='vector_db',
         log_file='logs/vector_db_server.log',
