@@ -13,9 +13,9 @@
     "port": 8003
   },
   "name_convention": {
-    "global_database": "MilvusDB_Global",
-    "global_collection_qa": "Collection_QA_Global",
-    "global_collection_doc": "Collection_DOC_Global"
+    "global_database": "MilvusDB_Global_GaoguanIP",
+    "global_collection_qa": "Collection_QA_Global_GaoguanIP",
+    "global_collection_doc": "Collection_DOC_Global_GaoguanIP"
   },
   "index_params": {
     "metric_type": "COSINE",
@@ -64,7 +64,7 @@
     "access_key": "minioadmin",
     "secret_key": "minioadmin123",
     "secure": false,
-    "bucket_name": "aihelper-files",
+    "bucket_name": "gaoguanip-files",
     "base_url": "http://220.154.134.61:9000"
   }
 }
