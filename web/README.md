@@ -21,7 +21,7 @@ npm install
 npm run dev
 ```
 
-启动后访问 `http://localhost:8004`
+启动后访问 `http://localhost:8002`
 
 ## 构建生产版本
 
