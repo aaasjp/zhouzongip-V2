@@ -109,14 +109,29 @@
             </el-form-item>
             <el-form-item label="对话模式">
               <el-select 
-                v-model="chatForm.prompt_type" 
+                v-model="chatForm.chat_mode" 
                 placeholder="请选择" 
                 style="width: 150px;"
                 size="small"
               >
-                <el-option label="普通对话" value="" />
+                <el-option label="普通对话" value="general" />
                 <el-option label="创意生成" value="idea_gen" />
                 <el-option label="脚本生成" value="scripts_gen" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="外部资源">
+              <el-checkbox v-model="chatForm.use_external_resource" size="small">小红书</el-checkbox>
+            </el-form-item>
+            <el-form-item label="主题">
+              <el-select 
+                v-model="chatForm.theme" 
+                placeholder="可选" 
+                style="width: 150px;"
+                size="small"
+              >
+                <el-option label="默认" value="" />
+                <el-option label="理工男" value="tech_male" />
+                <el-option label="海外出差" value="overseas_trip" />
               </el-select>
             </el-form-item>
             <el-form-item>
@@ -193,7 +208,9 @@ export default {
         use_vector_db: true,
         stream: true,
         session_id: '',
-        prompt_type: '' // 对话模式：''普通对话, 'idea_gen'创意生成, 'scripts_gen'脚本生成
+        chat_mode: 'general', // 对话模式：'general'普通对话, 'idea_gen'创意生成, 'scripts_gen'脚本生成
+        use_external_resource: false,
+        theme: ''
       },
       chatting: false,
       streaming: false,
@@ -463,7 +480,9 @@ export default {
           uploaded_docs: uploadedDocs,
           stream: true,
           limit: 5,
-          prompt_type: this.chatForm.prompt_type || ''
+          chat_mode: this.chatForm.chat_mode || 'general',
+          use_external_resource: this.chatForm.use_external_resource,
+          theme: this.chatForm.theme || ''
         })
       })
 
@@ -523,7 +542,9 @@ export default {
         uploaded_docs: uploadedDocs,
         stream: false,
         limit: 5,
-        prompt_type: this.chatForm.prompt_type || ''
+        chat_mode: this.chatForm.chat_mode || 'general',
+        use_external_resource: this.chatForm.use_external_resource,
+        theme: this.chatForm.theme || ''
       })
 
       if (res.data.status === 'success') {

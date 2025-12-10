@@ -19,6 +19,10 @@ from minio_utils.minio_client import upload_file
 from config.log_config import setup_chat_service_logging
 from prompts.idea_gen import idea_gen_prompt
 from prompts.scripts_gen import scripts_gen_prompt
+try:
+    from external_datasource.xiaohongshu_client import XiaoHongShuClient
+except Exception:
+    XiaoHongShuClient = None
 
 # 配置对话服务日志
 setup_chat_service_logging()
@@ -35,6 +39,7 @@ with open('./config/config.json', 'r', encoding='utf-8') as f:
 llm_service = LlmService()
 chat_service = ChatService()
 ocr_config = config.get('ocr_service', {})
+xhs_client = XiaoHongShuClient() if XiaoHongShuClient else None
 
 
 def generate_suggested_questions(user_question: str, answer: str, llm_service: LlmService) -> List[str]:
@@ -96,6 +101,82 @@ def format_sources(entities: List[Dict]) -> Dict[str, Any]:
         'count': len(documents),
         'documents': documents
     }
+
+
+def extract_keywords_from_question(question: str, max_keywords: int = 3) -> List[str]:
+    """从用户问题中简单提取关键词，用于外部资源检索"""
+    if not question:
+        return []
+    
+    # 使用中英文标点和空白分割，过滤掉过短的词
+    parts = re.split(r'[，,。！？；;、\s]+', question)
+    keywords: List[str] = []
+    for part in parts:
+        part = part.strip()
+        if 1 < len(part) <= 12 and part not in keywords:
+            keywords.append(part)
+        if len(keywords) >= max_keywords:
+            break
+    
+    # 兜底：如果没有有效关键词，使用截断后的原问题
+    if not keywords:
+        keywords = [truncate_text(question, 20)]
+    return keywords
+
+
+def build_xhs_context(question: str, max_items: int = 3, max_content_len: int = 300) -> Tuple[str, List[Dict[str, str]]]:
+    """
+    调用小红书接口并构建上下文片段
+    
+    Returns:
+        context_text: 用于提示词的文本
+        source_docs: 供前端展示的来源信息
+    """
+    if not xhs_client:
+        return "", []
+    
+    keywords = extract_keywords_from_question(question)
+    if not keywords:
+        return "", []
+    
+    try:
+        result = xhs_client.keyword_search(
+            keywords=keywords,
+            keyword_relationship="AND"
+        )
+        items = result.get('info_list', []) if isinstance(result, dict) else []
+        if not items:
+            return "", []
+        
+        context_blocks = []
+        source_docs = []
+        for item in items[:max_items]:
+            data = item.get('data', {}) if isinstance(item, dict) else {}
+            title = data.get('title', '') or '小红书笔记'
+            content = data.get('content', '') or ''
+            url = data.get('url', '') or ''
+            
+            snippet = truncate_text(content, max_content_len)
+            block = f"标题：{title}\n内容：{snippet}"
+            if url:
+                block += f"\n链接：{url}"
+            context_blocks.append(block)
+            
+            # 记录来源
+            if url:
+                source_docs.append({
+                    'name': title,
+                    'url': url
+                })
+        
+        if not context_blocks:
+            return "", []
+        
+        context_text = "外部资源（小红书）内容：\n" + "\n\n---外部笔记分隔---\n\n".join(context_blocks)
+        return context_text, source_docs
+    except Exception as e:
+        logger.error(f"调用小红书接口失败: {e}，keywords={keywords}")
+        return "", []
 
 
 def truncate_text(text: str, max_length: int) -> str:
@@ -216,7 +297,9 @@ def chat():
       - content: 文档内容（用于问答）
     - stream: 是否流式输出（默认true）
     - limit: 检索结果数量（默认5）
-    - prompt_type: 对话模式（可选），''普通对话, 'idea_gen'创意生成, 'scripts_gen'脚本生成
+    - chat_mode: 对话模式（可选），'general'普通对话, 'idea_gen'创意生成, 'scripts_gen'脚本生成
+    - use_external_resource: 是否启用外部资源（小红书），布尔值，默认false
+    - theme: 主题参数（可选），支持'tech_male'、'overseas_trip'
     """
     data = request.get_json()
     user_id = data.get('user_id', '')
@@ -235,7 +318,9 @@ def chat():
         uploaded_docs = []
     stream = data.get('stream', True)
     limit = data.get('limit', config.get('search_limit', 3))  # 默认从配置文件读取
-    prompt_type = data.get('prompt_type', '')  # 对话模式：''普通对话, 'idea_gen'创意生成, 'scripts_gen'脚本生成
+    chat_mode = data.get('chat_mode', 'general')  # 兼容旧字段
+    use_external_resource = data.get('use_external_resource', False)
+    theme = data.get('theme', '')  # 预留主题参数，目前未使用
     
     # 参数验证
     if not user_id:
@@ -372,15 +457,42 @@ def chat():
             import traceback
             logger.exception(f"素材库检索异常详情: {traceback.format_exc()}")
     
+    # 外部资源（小红书）检索
+    external_sources = []
+    if use_external_resource:
+        xhs_context, xhs_sources = build_xhs_context(question)
+        if xhs_context:
+            context_parts.append(xhs_context)
+        if xhs_sources:
+            external_sources.extend(xhs_sources)
+    
+    # 合并来源信息（向量库/上传文档 + 外部资源）
+    if external_sources:
+        merged_sources = sources_info.get('documents', []) + external_sources
+        # 按url去重
+        seen = set()
+        deduped_sources = []
+        for src in merged_sources:
+            url = src.get('url', '')
+            if url and url in seen:
+                continue
+            if url:
+                seen.add(url)
+            deduped_sources.append(src)
+        sources_info = {
+            'count': len(deduped_sources),
+            'documents': deduped_sources
+        }
+    
     # 构建系统提示词
     system_prompt = """你是一个专业的AI助手，能够基于提供的素材库内容回答用户问题。
 如果素材库中有相关内容，请基于素材库内容回答；如果没有相关内容，可以使用你的通用知识回答。
 回答要准确、简洁、有条理。"""
     
-    # 根据prompt_type添加相应的prompt
-    if prompt_type == 'idea_gen':
+    # 根据chat_mode添加相应的prompt
+    if chat_mode == 'idea_gen':
         system_prompt += "\n\n" + idea_gen_prompt
-    elif prompt_type == 'scripts_gen':
+    elif chat_mode == 'scripts_gen':
         system_prompt += "\n\n" + scripts_gen_prompt
     
     if context_parts:
