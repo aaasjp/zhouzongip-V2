@@ -50,9 +50,9 @@
   "mysql": {
     "host": "127.0.0.1",
     "port": 3306,
-    "user": "helper",
-    "password": "helper123",
-    "db_name": "ai_helper"
+    "user": "admin",
+    "password": "admin123",
+    "db_name": "gaoguanip"
   },
   "ocr_service": {
     "base_url": "http://172.17.10.144:8000",
