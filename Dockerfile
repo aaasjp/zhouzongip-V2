@@ -27,7 +27,7 @@ COPY . .
 RUN mkdir -p logs
 
 # 暴露端口
-EXPOSE 8005
+EXPOSE 8003
 
 # 启动服务
 CMD ["python", "main.py"]

@@ -85,7 +85,7 @@ def main():
     # 启动服务配置
     server_config = config.get('api_server', {})
     host = server_config.get('host', '0.0.0.0')
-    port = server_config.get('port', 8005)
+    port = server_config.get('port', 8003)
     
     # 启动服务
     

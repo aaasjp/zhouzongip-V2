@@ -59,15 +59,15 @@ npm run preview
 ### API代理配置
 
 在 `vite.config.js` 中配置了API代理：
-- `/vector_db_service` -> `http://localhost:8005`
-- `/chat_service` -> `http://localhost:8005`
+- `/vector_db_service` -> `http://localhost:8003`
+- `/chat_service` -> `http://localhost:8003`
 
 如果后端服务地址不同，请修改 `vite.config.js` 中的 `proxy` 配置。
 
 ## 注意事项
 
 1. **后端服务**：确保后端服务已启动
-   - 统一API服务：`http://localhost:8005`
+   - 统一API服务：`http://localhost:8003`
 
 2. **CORS配置**：确保后端服务已配置CORS，允许前端域名访问。
 
