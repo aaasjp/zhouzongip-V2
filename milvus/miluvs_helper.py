@@ -528,7 +528,7 @@ def _bm25_search(bm25, entities, query, limit):
     return results
 
 
-def _reciprocal_rank_fusion(vector_results, bm25_results, k=20, bm25_weight=1.2):
+def _reciprocal_rank_fusion(vector_results, bm25_results, k=60, bm25_weight=1.2):
     """使用RRF（Reciprocal Rank Fusion）融合向量检索和BM25检索结果
     
     Args:
@@ -703,7 +703,7 @@ def search_from_collection(tenant_code, org_code, collection_type, query_list, f
             
             # RRF融合
             logger.info(f"开始RRF融合结果")
-            rrf_k = config.get('hybrid_search', {}).get('rrf_k', 20)
+            rrf_k = config.get('hybrid_search', {}).get('rrf_k', 60)
             bm25_weight = config.get('hybrid_search', {}).get('bm25_weight', 1.2)
             fused_results = _reciprocal_rank_fusion(vector_results, bm25_results, k=rrf_k, bm25_weight=bm25_weight)
             

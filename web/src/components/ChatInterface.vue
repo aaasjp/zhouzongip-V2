@@ -38,148 +38,204 @@
       </div>
     </div>
 
-    <!-- 右侧主区域：对话内容 -->
+    <!-- 右侧主区域：对话内容 + 结构化展示 -->
     <div class="main-content">
-      <div class="chat-header" v-if="currentSessionTitle">
-        <h3>{{ currentSessionTitle }}</h3>
-      </div>
-      
-      <div class="chat-messages" ref="messagesContainer">
-        <div v-if="messages.length === 0 && !chatting" class="empty-chat">
-          <p>开始新的对话吧！</p>
+      <div class="conversation-pane">
+        <div class="chat-header" v-if="currentSessionTitle">
+          <h3>{{ currentSessionTitle }}</h3>
         </div>
         
-        <div v-for="(msg, index) in messages" :key="index" :class="['message', msg.role]">
-          <div class="message-wrapper">
-            <div class="message-content markdown-body" v-html="formatMessage(msg.content)"></div>
-            <div class="message-time">{{ formatTime(msg.created_at) }}</div>
-            <div v-if="msg.sources && msg.sources.length > 0" class="sources">
-              <strong>参考来源：</strong>
-              <span v-for="(source, idx) in msg.sources" :key="idx">
-                <a :href="source.url" target="_blank">{{ source.name }}</a>
-                <span v-if="idx < msg.sources.length - 1">, </span>
-              </span>
+        <div class="chat-messages" ref="messagesContainer">
+          <div v-if="messages.length === 0 && !chatting" class="empty-chat">
+            <p>开始新的对话吧！</p>
+          </div>
+          
+          <div v-for="(msg, index) in messages" :key="index" :class="['message', msg.role]">
+            <div class="message-wrapper">
+              <div 
+                v-if="getStructuredItems(msg.content).length === 0 || msg.role !== 'assistant'"
+                class="message-content markdown-body" 
+                v-html="formatMessage(msg.content)"
+              ></div>
+              <div v-else class="message-content structured-preview">
+                <span 
+                  v-for="(item, idx) in getStructuredItems(msg.content)" 
+                  :key="idx" 
+                  class="title-chip" 
+                  :class="{ script: item.type === 'script', active: isChipActive(item) }"
+                  @click="selectStructuredItem(item)"
+                >
+                  {{ item.title || '未命名' }}
+                </span>
+              </div>
+              <div class="message-time">{{ formatTime(msg.created_at) }}</div>
+              <div v-if="msg.sources && msg.sources.length > 0" class="sources">
+                <strong>参考来源：</strong>
+                <span v-for="(source, idx) in msg.sources" :key="idx">
+                  <a :href="source.url" target="_blank">{{ source.name }}</a>
+                  <span v-if="idx < msg.sources.length - 1">, </span>
+                </span>
+              </div>
+              <div v-if="msg.suggested_questions && msg.suggested_questions.length > 0" class="suggested-questions">
+                <span 
+                  v-for="(q, idx) in msg.suggested_questions" 
+                  :key="idx"
+                  class="suggested-question"
+                  @click="askQuestion(q)">
+                  {{ q }}
+                </span>
+              </div>
             </div>
-            <div v-if="msg.suggested_questions && msg.suggested_questions.length > 0" class="suggested-questions">
-              <span 
-                v-for="(q, idx) in msg.suggested_questions" 
-                :key="idx"
-                class="suggested-question"
-                @click="askQuestion(q)">
-                {{ q }}
-              </span>
+          </div>
+          
+          <div v-if="streaming" class="message assistant">
+            <div class="message-wrapper">
+              <div 
+                v-if="getStructuredItems(currentAnswer).length === 0"
+                class="message-content markdown-body" 
+                v-html="formatMessage(currentAnswer)"
+              ></div>
+              <div v-else class="message-content structured-preview">
+                <span 
+                  v-for="(item, idx) in getStructuredItems(currentAnswer)" 
+                  :key="idx" 
+                  class="title-chip" 
+                  :class="{ script: item.type === 'script', active: isChipActive(item) }"
+                  @click="selectStructuredItem(item)"
+                >
+                  {{ item.title || '未命名' }}
+                </span>
+              </div>
+              <div class="message-time">正在输出...</div>
             </div>
           </div>
         </div>
         
-        <div v-if="streaming" class="message assistant">
-          <div class="message-wrapper">
-            <div class="message-content markdown-body" v-html="formatMessage(currentAnswer)"></div>
-            <div class="message-time">正在输出...</div>
+        <div class="input-area">
+          <div class="input-settings">
+            <el-form :model="chatForm" inline>
+              <el-form-item label="用户ID">
+                <el-input 
+                  v-model="chatForm.user_id" 
+                  placeholder="请输入用户ID" 
+                  style="width: 150px;"
+                  size="small"
+                />
+              </el-form-item>
+              <el-form-item label="租户代码">
+                <el-input 
+                  v-model="chatForm.tenant_code" 
+                  placeholder="可选" 
+                  style="width: 120px;"
+                  size="small"
+                />
+              </el-form-item>
+              <el-form-item label="组织代码">
+                <el-input 
+                  v-model="chatForm.org_code" 
+                  placeholder="可选" 
+                  style="width: 120px;"
+                  size="small"
+                />
+              </el-form-item>
+              <el-form-item label="对话模式">
+                <el-select 
+                  v-model="chatForm.chat_mode" 
+                  placeholder="请选择" 
+                  style="width: 150px;"
+                  size="small"
+                >
+                  <el-option label="普通对话" value="general" />
+                  <el-option label="创意生成" value="idea_gen" />
+                  <el-option label="脚本生成" value="scripts_gen" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="外部资源">
+                <el-checkbox v-model="chatForm.use_external_resource" size="small">小红书</el-checkbox>
+              </el-form-item>
+              <el-form-item label="主题">
+                <el-select 
+                  v-model="chatForm.theme" 
+                  placeholder="可选" 
+                  style="width: 150px;"
+                  size="small"
+                >
+                  <el-option label="默认" value="" />
+                  <el-option label="理工男" value="tech_male" />
+                  <el-option label="海外出差" value="overseas_trip" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-checkbox v-model="chatForm.use_vector_db" size="small">使用素材库</el-checkbox>
+                <el-checkbox v-model="chatForm.stream" size="small">流式输出</el-checkbox>
+              </el-form-item>
+            </el-form>
           </div>
-        </div>
-      </div>
-      
-      <div class="input-area">
-        <div class="input-settings">
-          <el-form :model="chatForm" inline>
-            <el-form-item label="用户ID">
-              <el-input 
-                v-model="chatForm.user_id" 
-                placeholder="请输入用户ID" 
-                style="width: 150px;"
-                size="small"
-              />
-            </el-form-item>
-            <el-form-item label="租户代码">
-              <el-input 
-                v-model="chatForm.tenant_code" 
-                placeholder="可选" 
-                style="width: 120px;"
-                size="small"
-              />
-            </el-form-item>
-            <el-form-item label="组织代码">
-              <el-input 
-                v-model="chatForm.org_code" 
-                placeholder="可选" 
-                style="width: 120px;"
-                size="small"
-              />
-            </el-form-item>
-            <el-form-item label="对话模式">
-              <el-select 
-                v-model="chatForm.chat_mode" 
-                placeholder="请选择" 
-                style="width: 150px;"
-                size="small"
-              >
-                <el-option label="普通对话" value="general" />
-                <el-option label="创意生成" value="idea_gen" />
-                <el-option label="脚本生成" value="scripts_gen" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="外部资源">
-              <el-checkbox v-model="chatForm.use_external_resource" size="small">小红书</el-checkbox>
-            </el-form-item>
-            <el-form-item label="主题">
-              <el-select 
-                v-model="chatForm.theme" 
-                placeholder="可选" 
-                style="width: 150px;"
-                size="small"
-              >
-                <el-option label="默认" value="" />
-                <el-option label="理工男" value="tech_male" />
-                <el-option label="海外出差" value="overseas_trip" />
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-checkbox v-model="chatForm.use_vector_db" size="small">使用素材库</el-checkbox>
-              <el-checkbox v-model="chatForm.stream" size="small">流式输出</el-checkbox>
-            </el-form-item>
-          </el-form>
-        </div>
-        
-        <div class="uploaded-docs" v-if="uploadedDocs.length > 0">
-          <div class="doc-tag" v-for="(doc, idx) in uploadedDocs" :key="idx" :class="{ 'doc-error': !doc.parse_success }">
-            <span>{{ doc.file_name }}</span>
-            <span v-if="doc.parse_success" class="doc-status">✓</span>
-            <span v-else class="doc-status error">✗</span>
-            <el-icon @click="removeDoc(idx)" class="doc-remove"><Close /></el-icon>
+          
+          <div class="uploaded-docs" v-if="uploadedDocs.length > 0">
+            <div class="doc-tag" v-for="(doc, idx) in uploadedDocs" :key="idx" :class="{ 'doc-error': !doc.parse_success }">
+              <span>{{ doc.file_name }}</span>
+              <span v-if="doc.parse_success" class="doc-status">✓</span>
+              <span v-else class="doc-status error">✗</span>
+              <el-icon @click="removeDoc(idx)" class="doc-remove"><Close /></el-icon>
+            </div>
           </div>
-        </div>
-        
-        <div class="input-box">
-          <el-input 
-            v-model="chatForm.question" 
-            type="textarea" 
-            :rows="3"
-            placeholder="请输入您的问题... (Ctrl+Enter 发送)"
-            @keyup.ctrl.enter="sendMessage"
-            :disabled="chatting"
-          />
-          <div class="input-actions">
-            <el-upload
-              :action="'/chat_service/upload_and_parse'"
-              :on-success="handleUploadAndParseSuccess"
-              :on-error="handleUploadError"
-              :before-upload="beforeUpload"
-              :show-file-list="false"
-              :multiple="true"
+          
+          <div class="input-box">
+            <el-input 
+              v-model="chatForm.question" 
+              type="textarea" 
+              :rows="3"
+              placeholder="请输入您的问题... (Ctrl+Enter 发送)"
+              @keyup.ctrl.enter="sendMessage"
               :disabled="chatting"
-            >
-              <el-button :disabled="chatting">上传并解析文档</el-button>
-            </el-upload>
-            <el-button 
-              type="primary" 
-              @click="sendMessage" 
-              :loading="chatting"
-              :disabled="!chatForm.question || !chatForm.user_id"
-            >
-              发送
-            </el-button>
-            <el-button @click="clearChat" :disabled="chatting">清空</el-button>
+            />
+            <div class="input-actions">
+              <el-upload
+                :action="'/chat_service/upload_and_parse'"
+                :on-success="handleUploadAndParseSuccess"
+                :on-error="handleUploadError"
+                :before-upload="beforeUpload"
+                :show-file-list="false"
+                :multiple="true"
+                :disabled="chatting"
+              >
+                <el-button :disabled="chatting">上传并解析文档</el-button>
+              </el-upload>
+              <el-button 
+                type="primary" 
+                @click="sendMessage" 
+                :loading="chatting"
+                :disabled="!chatForm.question || !chatForm.user_id"
+              >
+                发送
+              </el-button>
+              <el-button @click="clearChat" :disabled="chatting">清空</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="structured-pane" v-if="structuredItems.length > 0">
+        <div class="structured-header">
+          <div class="structured-title">
+            {{ chatForm.chat_mode === 'idea_gen' ? '创意输出' : chatForm.chat_mode === 'scripts_gen' ? '脚本输出' : '结构化内容' }}
+          </div>
+        </div>
+        <div class="structured-body" v-if="structuredItems.length > 0">
+          <div 
+            class="structured-card" 
+            v-for="(item, idx) in structuredItems" 
+            :key="idx"
+            :class="{ active: idx === activeStructuredIndex }"
+          >
+            <div class="structured-card-title">
+              <span class="structured-tag" :class="{ script: item.type === 'script' }">
+                {{ item.type === 'script' ? '脚本' : '创意' }}
+              </span>
+              <span class="structured-title-text">{{ item.title || '未命名' }}</span>
+            </div>
+            <div class="structured-card-content markdown-body" v-html="formatMessage(item.content)"></div>
           </div>
         </div>
       </div>
@@ -220,7 +276,10 @@ export default {
       currentSessionId: '',
       currentSessionTitle: '',
       loadingSessions: false,
-      uploadedDocs: [] // 上传的文档列表 [{file_name: '', file_url: '', content: '', parse_success: true}]
+      uploadedDocs: [], // 上传的文档列表 [{file_name: '', file_url: '', content: '', parse_success: true}]
+      structuredItems: [], // 结构化的创意/脚本输出
+      activeStructuredIndex: 0, // 右侧高亮的卡片索引
+      lastSources: [] // 最近一次助手回复的参考来源
     }
   },
   mounted() {
@@ -325,6 +384,11 @@ export default {
             suggested_questions: msg.suggested_questions || []
           }))
           
+          const lastAssistant = [...this.messages].reverse().find(m => m.role === 'assistant')
+          this.structuredItems = this.parseStructuredContent(lastAssistant?.content || '')
+          this.lastSources = lastAssistant?.sources || []
+          this.activeStructuredIndex = 0
+
           this.$nextTick(() => {
             this.scrollToBottom()
           })
@@ -423,6 +487,11 @@ export default {
         created_at: new Date().toISOString()
       })
 
+      // 新问题时清空右侧结构化内容，等新输出再显示
+      this.structuredItems = []
+      this.lastSources = []
+      this.activeStructuredIndex = 0
+
       this.chatting = true
       this.streaming = this.chatForm.stream
       this.currentAnswer = ''
@@ -512,9 +581,18 @@ export default {
                 suggested_questions: data.suggested_questions || [],
                 created_at: new Date().toISOString()
               })
+              this.structuredItems = this.parseStructuredContent(data.content)
+              this.lastSources = data.sources?.documents || []
+            this.activeStructuredIndex = 0
               this.currentAnswer = ''
             } else {
               this.currentAnswer = data.content
+              // 流式过程中实时解析，标题出现即生成卡片，内容出现即右侧更新
+            const items = this.parseStructuredContent(this.currentAnswer)
+            this.structuredItems = items
+            if (items.length > 0 && this.activeStructuredIndex >= items.length) {
+              this.activeStructuredIndex = 0
+            }
             }
           }
         }
@@ -555,6 +633,9 @@ export default {
           suggested_questions: res.data.data.suggested_questions || [],
           created_at: new Date().toISOString()
         })
+        this.structuredItems = this.parseStructuredContent(res.data.data.answer)
+        this.lastSources = res.data.data.sources?.documents || []
+        this.activeStructuredIndex = 0
       } else {
         throw new Error(res.data.msg)
       }
@@ -571,6 +652,9 @@ export default {
       this.currentSessionTitle = ''
       this.chatForm.session_id = ''
       this.uploadedDocs = []
+      this.structuredItems = []
+      this.activeStructuredIndex = 0
+      this.lastSources = []
     },
     
     formatMessage(content) {
@@ -672,6 +756,111 @@ export default {
     
     removeDoc(index) {
       this.uploadedDocs.splice(index, 1)
+    },
+
+    getStructuredItems(content) {
+      return this.parseStructuredContent(content)
+    },
+
+    selectStructuredItem(item) {
+      if (!item) return
+      const idx = this.structuredItems.findIndex(
+        it => it.title === item.title && it.type === item.type
+      )
+      if (idx !== -1) {
+        this.activeStructuredIndex = idx
+        this.$nextTick(() => {
+          const container = this.$el.querySelector('.structured-body')
+          const cards = container ? container.querySelectorAll('.structured-card') : []
+          if (cards[idx]) {
+            cards[idx].scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        })
+      }
+    },
+
+    isChipActive(item) {
+      const idx = this.structuredItems.findIndex(
+        it => it.title === item.title && it.type === item.type
+      )
+      return idx === this.activeStructuredIndex
+    },
+
+    parseStructuredContent(content) {
+      if (!content) return []
+      const results = []
+      const text = content
+      const startTokens = [
+        { type: 'idea', token: '[IDEA_START]', end: '[IDEA_END]' },
+        { type: 'script', token: '[SCRIPT_START]', end: '[SCRIPT_END]' }
+      ]
+      const cleanTags = (str) => {
+        return (str || '').replace(/\[(IDEA|SCRIPT)_START\]|\[(IDEA|SCRIPT)_END\]|\[TITLE_START\]|\[TITLE_END\]|\[END_TITLE\]|\[CONTENT_START\]|\[CONTENT_END\]|\[END_CONTENT\]/g, '').trim()
+      }
+
+      let cursor = 0
+      while (cursor < text.length) {
+        let next = null
+        startTokens.forEach(t => {
+          const idx = text.indexOf(t.token, cursor)
+          if (idx !== -1 && (next === null || idx < next.idx)) {
+            next = { ...t, idx }
+          }
+        })
+        if (!next) break
+
+        const segmentStart = next.idx + next.token.length
+        const nextEnd = text.indexOf(next.end, segmentStart)
+        const segment = text.substring(segmentStart, nextEnd === -1 ? text.length : nextEnd)
+
+        const titleStartTag = '[TITLE_START]'
+        const titleEndTag = '[TITLE_END]'
+        const titleEndAltTag = '[END_TITLE]'
+        const contentStartTag = '[CONTENT_START]'
+        const contentEndTag = '[CONTENT_END]'
+        const contentEndAltTag = '[END_CONTENT]'
+
+        const titleStartIdx = segment.indexOf(titleStartTag)
+        const titleEndIdx = segment.indexOf(titleEndTag, titleStartIdx + titleStartTag.length)
+        const titleEndAltIdx = segment.indexOf(titleEndAltTag, titleStartIdx + titleStartTag.length)
+        const contentStartIdx = segment.indexOf(contentStartTag)
+        const contentEndIdx = segment.indexOf(contentEndTag, contentStartIdx + contentStartTag.length)
+        const contentEndAltIdx = segment.indexOf(contentEndAltTag, contentStartIdx + contentStartTag.length)
+
+        if (titleStartIdx !== -1) {
+          const title = segment.substring(
+            titleStartIdx + titleStartTag.length,
+            titleEndIdx !== -1
+              ? titleEndIdx
+              : titleEndAltIdx !== -1
+                ? titleEndAltIdx
+                : contentStartIdx !== -1
+                  ? contentStartIdx
+                  : segment.length
+          )
+
+          let body = ''
+          if (contentStartIdx !== -1) {
+            const bodyStart = contentStartIdx + contentStartTag.length
+            const bodyEnd = contentEndIdx !== -1
+              ? contentEndIdx
+              : contentEndAltIdx !== -1
+                ? contentEndAltIdx
+                : segment.length
+            body = segment.substring(bodyStart, bodyEnd)
+          }
+
+          results.push({
+            type: next.type,
+            title: cleanTags(title),
+            content: cleanTags(body)
+          })
+        }
+
+        cursor = nextEnd !== -1 ? nextEnd + next.end.length : text.length
+      }
+
+      return results
     }
   },
   
@@ -782,8 +971,25 @@ export default {
 .main-content {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   background: white;
+}
+
+.conversation-pane {
+  flex: 1 1 60%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #e4e7ed;
+  min-width: 0;
+}
+
+.structured-pane {
+  width: 40%;
+  max-width: 520px;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #f7f9fc 0%, #f4f7fb 100%);
 }
 
 .chat-header {
@@ -799,11 +1005,116 @@ export default {
   color: #303133;
 }
 
+.structured-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e4e7ed;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
+}
+
+.structured-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2d3d;
+}
+
+.structured-subtitle {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #909399;
+}
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
   background: #fafafa;
+}
+
+.structured-body {
+  flex: 1;
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.structured-card {
+  background: white;
+  border: 1px solid #e4e7ed;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+.structured-card.active {
+  border-color: #409eff;
+  box-shadow: 0 8px 24px rgba(64, 158, 255, 0.12);
+}
+
+.structured-sources {
+  padding: 0 20px 16px;
+  font-size: 12px;
+  color: #606266;
+}
+
+.structured-sources a {
+  color: #409eff;
+}
+
+.structured-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 10px;
+}
+
+.structured-tag {
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: #ecf5ff;
+  color: #409eff;
+  font-size: 12px;
+  border: 1px solid #b3d8ff;
+}
+
+.structured-tag.script {
+  background: #fef3e6;
+  color: #e6a23c;
+  border-color: #f3d19e;
+}
+
+.structured-title-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.structured-card-content {
+  color: #303133;
+}
+
+.structured-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  color: #909399;
+  text-align: center;
+  gap: 6px;
+}
+
+.structured-empty .hint {
+  font-size: 12px;
+  color: #c0c4cc;
 }
 
 .empty-chat {
@@ -846,6 +1157,36 @@ export default {
   background: white;
   border: 1px solid #e4e7ed;
   color: #303133;
+}
+
+.structured-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.title-chip {
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1f7aff, #5aa9ff);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid #1f7aff;
+  line-height: 1.2;
+  box-shadow: 0 6px 16px rgba(31, 122, 255, 0.18);
+}
+
+.title-chip.script {
+  background: linear-gradient(135deg, #f0a500, #f5c163);
+  color: #fff;
+  border-color: #f0a500;
+  box-shadow: 0 6px 16px rgba(240, 165, 0, 0.18);
+}
+
+.title-chip.active {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 2px rgba(13,110,253,0.28);
 }
 
 /* Markdown样式 */
@@ -1023,9 +1364,10 @@ export default {
 .suggested-questions {
   margin-top: 8px;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   padding: 0 4px;
+  overflow-x: auto;
 }
 
 .suggested-question {

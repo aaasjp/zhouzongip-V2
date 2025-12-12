@@ -35,14 +35,14 @@
   },
   "hybrid_search": {
     "default_use_hybrid": true,
-    "rrf_k": 20
+    "rrf_k": 60
   },
   "similarity_thresholds": {
     "vector_similarity_threshold": 0.75,
-    "rrf_similarity_threshold": 0.085
+    "rrf_similarity_threshold": 0.03
   },
   "search_limit": 3,
-  "embedding_model_path": "/workspace/embeddings/bge-large-zh-v1.5",
+  "embedding_model_path": "BAAI/bge-large-zh-v1.5",
   "split": {
     "chunk_size": 2000,
     "overlap": 100

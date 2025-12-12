@@ -299,7 +299,7 @@ def chat():
     - limit: 检索结果数量（默认5）
     - chat_mode: 对话模式（可选），'general'普通对话, 'idea_gen'创意生成, 'scripts_gen'脚本生成
     - use_external_resource: 是否启用外部资源（小红书），布尔值，默认false
-    - theme: 主题参数（可选），支持'tech_male'、'overseas_trip'
+    - theme: 主题参数（可选），'tech_male'（理工男）、'overseas_trip'（海外出差）
     """
     data = request.get_json()
     user_id = data.get('user_id', '')
@@ -320,7 +320,18 @@ def chat():
     limit = data.get('limit', config.get('search_limit', 3))  # 默认从配置文件读取
     chat_mode = data.get('chat_mode', 'general')  # 兼容旧字段
     use_external_resource = data.get('use_external_resource', False)
-    theme = data.get('theme', '')  # 预留主题参数，目前未使用
+    # 主题参数校验与转换
+    raw_theme = data.get('theme', '')
+    theme = raw_theme.strip() if isinstance(raw_theme, str) else ''
+    theme_map = {
+        'tech_male': '理工男/技术专家风格',
+        'overseas_trip': '海外出差/国际视角'
+    }
+    theme_text = ''
+    if theme:
+        if theme not in theme_map:
+            return jsonify({'status': 'fail', 'msg': f'不支持的主题: {theme}', 'code': 400, 'data': ''})
+        theme_text = theme_map[theme]
     
     # 参数验证
     if not user_id:
@@ -485,15 +496,18 @@ def chat():
         }
     
     # 构建系统提示词
-    system_prompt = """你是一个专业的AI助手，能够基于提供的素材库内容回答用户问题。
-如果素材库中有相关内容，请基于素材库内容回答；如果没有相关内容，可以使用你的通用知识回答。
-回答要准确、简洁、有条理。"""
+    system_prompt = """你是一个专业的AI助手，能够基于提供的素材内容回答用户问题。
+如果素材中有相关内容，请基于素材内容回答；如果没有相关内容，可以使用你的通用知识回答。
+"""
     
-    # 根据chat_mode添加相应的prompt
+    # 根据chat_mode添加相应的prompt，并注入主题
     if chat_mode == 'idea_gen':
-        system_prompt += "\n\n" + idea_gen_prompt
+        system_prompt += "\n\n" + idea_gen_prompt.format(theme=theme_text or "无主题")
     elif chat_mode == 'scripts_gen':
-        system_prompt += "\n\n" + scripts_gen_prompt
+        system_prompt += "\n\n" + scripts_gen_prompt.format(theme=theme_text or "无主题")
+    elif theme_text:
+        # 通用模式也追加主题
+        system_prompt += f"\n\n# 主题\n{theme_text}"
     
     if context_parts:
         system_prompt += "\n\n" + "\n\n".join(context_parts)

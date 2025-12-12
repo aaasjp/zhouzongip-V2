@@ -4,6 +4,8 @@ idea_gen.py 生成idea的prompt
 """
 
 idea_gen_prompt = """
+# 创意生成主题：{theme}
+
 # 创意生成要求
 
 ## 输出要求
@@ -25,6 +27,8 @@ idea_gen_prompt = """
 ## 目标受众
 主要面向年轻用户和小红书群体，创意需新颖创新，符合年轻人审美和兴趣点。
 
-## 输出格式
+## 输出要求
 仅输出创意方案（包含拍摄思路、手法、亮点），不输出分镜脚本。
+输出格式：[IDEA_START][TITLE_START]标题1[TITLE_END][CONTENT_START]创意方案1[CONTENT_END][IDEA_END][IDEA_START][TITLE_START]标题2[TITLE_END][CONTENT_START]创意方案2[CONTENT_END][IDEA_END][IDEA_START][TITLE_START]标题3[TITLE_END][CONTENT_START]创意方案3[CONTENT_END][IDEA_END]
+
 """
