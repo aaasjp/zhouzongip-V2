@@ -7,6 +7,7 @@ import json
 import os
 import uuid
 import re
+from datetime import datetime, timedelta, date
 from typing import Optional, List, Dict, Any, Generator, Tuple
 from flask import Blueprint, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
@@ -623,6 +624,98 @@ def list_sessions():
         'code': 200,
         'msg': '获取会话列表成功',
         'data': sessions
+    })
+
+
+@chat_bp.route('/chat_service/sessions_format', methods=['GET'])
+def list_sessions_format():
+    """获取格式化的会话列表：按今天、昨天、最近七天分组"""
+    user_id = request.args.get('user_id', '')
+    tenant_code = request.args.get('tenant_code', '')
+    org_code = request.args.get('org_code', '')
+    limit = int(request.args.get('limit', 100))  # 增加limit以获取更多会话用于分组
+    
+    if not user_id:
+        return jsonify({'status': 'fail', 'msg': '缺少用户ID', 'code': 400, 'data': ''})
+    
+    # 获取所有会话
+    sessions = chat_service.list_sessions(user_id, tenant_code, org_code, limit)
+    
+    # 计算日期范围
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    seven_days_ago = today - timedelta(days=7)
+    
+    # 初始化分组列表
+    today_history_list = []
+    yesterday_history_list = []
+    seven_days_history_list = []
+    
+    # 遍历会话，按创建时间分组
+    for session in sessions:
+        if not session.get('created_at'):
+            continue
+        
+        # 处理created_at字段（可能是datetime对象或字符串）
+        created_at = session.get('created_at')
+        if isinstance(created_at, str):
+            try:
+                created_at = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
+            except:
+                try:
+                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                except:
+                    continue
+        elif isinstance(created_at, datetime):
+            pass
+        else:
+            continue
+        
+        # 转换为date对象用于比较
+        session_date = created_at.date()
+        
+        # 分组（最近七天不包括今天和昨天）
+        if session_date == today:
+            today_history_list.append(session)
+        elif session_date == yesterday:
+            yesterday_history_list.append(session)
+        elif session_date >= seven_days_ago and session_date < yesterday:
+            seven_days_history_list.append(session)
+    
+    # 按更新时间倒序排列（最新的在前）
+    def get_sort_key(session):
+        """获取排序键，处理datetime对象和字符串"""
+        updated_at = session.get('updated_at')
+        if updated_at is None:
+            return datetime.min
+        if isinstance(updated_at, datetime):
+            return updated_at
+        if isinstance(updated_at, str):
+            try:
+                return datetime.strptime(updated_at, '%Y-%m-%d %H:%M:%S')
+            except:
+                try:
+                    return datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                except:
+                    return datetime.min
+        return datetime.min
+    
+    today_history_list.sort(key=get_sort_key, reverse=True)
+    yesterday_history_list.sort(key=get_sort_key, reverse=True)
+    seven_days_history_list.sort(key=get_sort_key, reverse=True)
+    
+    # 格式化返回数据
+    formatted_data = {
+        'todayHistoryList': today_history_list,
+        'yesterdayHistoryList': yesterday_history_list,
+        'sevenDaysHistoryList': seven_days_history_list
+    }
+    
+    return jsonify({
+        'status': 'success',
+        'code': 200,
+        'msg': '获取格式化会话列表成功',
+        'data': formatted_data
     })
 
 

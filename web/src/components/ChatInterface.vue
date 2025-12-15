@@ -58,15 +58,23 @@
                 v-html="formatMessage(msg.content)"
               ></div>
               <div v-else class="message-content structured-preview">
-                <span 
-                  v-for="(item, idx) in getStructuredItems(msg.content)" 
-                  :key="idx" 
-                  class="title-chip" 
-                  :class="{ script: item.type === 'script', active: isChipActive(item) }"
-                  @click="selectStructuredItem(item)"
-                >
-                  {{ item.title || '未命名' }}
-                </span>
+                <!-- 显示总体说明 -->
+                <div v-if="getStructuredDescription(msg.content)" class="message-description">
+                  <div class="description-label">总体说明：</div>
+                  <div class="description-content markdown-body" v-html="formatMessage(getStructuredDescription(msg.content))"></div>
+                </div>
+                <!-- 显示标题芯片 -->
+                <div class="title-chips">
+                  <span 
+                    v-for="(item, idx) in getStructuredItems(msg.content)" 
+                    :key="idx" 
+                    class="title-chip" 
+                    :class="{ script: item.type === 'script', active: isChipActive(item) }"
+                    @click="selectStructuredItem(item)"
+                  >
+                    {{ item.title || '未命名' }}
+                  </span>
+                </div>
               </div>
               <div class="message-time">{{ formatTime(msg.created_at) }}</div>
               <div v-if="msg.sources && msg.sources.length > 0" class="sources">
@@ -96,15 +104,23 @@
                 v-html="formatMessage(currentAnswer)"
               ></div>
               <div v-else class="message-content structured-preview">
-                <span 
-                  v-for="(item, idx) in getStructuredItems(currentAnswer)" 
-                  :key="idx" 
-                  class="title-chip" 
-                  :class="{ script: item.type === 'script', active: isChipActive(item) }"
-                  @click="selectStructuredItem(item)"
-                >
-                  {{ item.title || '未命名' }}
-                </span>
+                <!-- 显示总体说明 -->
+                <div v-if="getStructuredDescription(currentAnswer)" class="message-description">
+                  <div class="description-label">总体说明：</div>
+                  <div class="description-content markdown-body" v-html="formatMessage(getStructuredDescription(currentAnswer))"></div>
+                </div>
+                <!-- 显示标题芯片 -->
+                <div class="title-chips">
+                  <span 
+                    v-for="(item, idx) in getStructuredItems(currentAnswer)" 
+                    :key="idx" 
+                    class="title-chip" 
+                    :class="{ script: item.type === 'script', active: isChipActive(item) }"
+                    @click="selectStructuredItem(item)"
+                  >
+                    {{ item.title || '未命名' }}
+                  </span>
+                </div>
               </div>
               <div class="message-time">正在输出...</div>
             </div>
@@ -223,6 +239,7 @@
           </div>
         </div>
         <div class="structured-body" v-if="structuredItems.length > 0">
+          <!-- 具体项目卡片 -->
           <div 
             class="structured-card" 
             v-for="(item, idx) in structuredItems" 
@@ -278,6 +295,7 @@ export default {
       loadingSessions: false,
       uploadedDocs: [], // 上传的文档列表 [{file_name: '', file_url: '', content: '', parse_success: true}]
       structuredItems: [], // 结构化的创意/脚本输出
+      structuredDescription: '', // 创意/脚本的总体说明
       activeStructuredIndex: 0, // 右侧高亮的卡片索引
       lastSources: [] // 最近一次助手回复的参考来源
     }
@@ -385,7 +403,9 @@ export default {
           }))
           
           const lastAssistant = [...this.messages].reverse().find(m => m.role === 'assistant')
-          this.structuredItems = this.parseStructuredContent(lastAssistant?.content || '')
+          const parsed = this.parseStructuredContent(lastAssistant?.content || '')
+          this.structuredItems = parsed.items || []
+          this.structuredDescription = parsed.description || ''
           this.lastSources = lastAssistant?.sources || []
           this.activeStructuredIndex = 0
 
@@ -489,6 +509,7 @@ export default {
 
       // 新问题时清空右侧结构化内容，等新输出再显示
       this.structuredItems = []
+      this.structuredDescription = ''
       this.lastSources = []
       this.activeStructuredIndex = 0
 
@@ -581,18 +602,21 @@ export default {
                 suggested_questions: data.suggested_questions || [],
                 created_at: new Date().toISOString()
               })
-              this.structuredItems = this.parseStructuredContent(data.content)
+              const parsed = this.parseStructuredContent(data.content)
+              this.structuredItems = parsed.items || []
+              this.structuredDescription = parsed.description || ''
               this.lastSources = data.sources?.documents || []
-            this.activeStructuredIndex = 0
+              this.activeStructuredIndex = 0
               this.currentAnswer = ''
             } else {
               this.currentAnswer = data.content
               // 流式过程中实时解析，标题出现即生成卡片，内容出现即右侧更新
-            const items = this.parseStructuredContent(this.currentAnswer)
-            this.structuredItems = items
-            if (items.length > 0 && this.activeStructuredIndex >= items.length) {
-              this.activeStructuredIndex = 0
-            }
+              const parsed = this.parseStructuredContent(this.currentAnswer)
+              this.structuredItems = parsed.items || []
+              this.structuredDescription = parsed.description || ''
+              if (this.structuredItems.length > 0 && this.activeStructuredIndex >= this.structuredItems.length) {
+                this.activeStructuredIndex = 0
+              }
             }
           }
         }
@@ -633,7 +657,9 @@ export default {
           suggested_questions: res.data.data.suggested_questions || [],
           created_at: new Date().toISOString()
         })
-        this.structuredItems = this.parseStructuredContent(res.data.data.answer)
+        const parsed = this.parseStructuredContent(res.data.data.answer)
+        this.structuredItems = parsed.items || []
+        this.structuredDescription = parsed.description || ''
         this.lastSources = res.data.data.sources?.documents || []
         this.activeStructuredIndex = 0
       } else {
@@ -653,6 +679,7 @@ export default {
       this.chatForm.session_id = ''
       this.uploadedDocs = []
       this.structuredItems = []
+      this.structuredDescription = ''
       this.activeStructuredIndex = 0
       this.lastSources = []
     },
@@ -759,7 +786,13 @@ export default {
     },
 
     getStructuredItems(content) {
-      return this.parseStructuredContent(content)
+      const parsed = this.parseStructuredContent(content)
+      return parsed.items || []
+    },
+
+    getStructuredDescription(content) {
+      const parsed = this.parseStructuredContent(content)
+      return parsed.description || ''
     },
 
     selectStructuredItem(item) {
@@ -787,8 +820,9 @@ export default {
     },
 
     parseStructuredContent(content) {
-      if (!content) return []
+      if (!content) return { items: [], description: '' }
       const results = []
+      let description = ''
       const text = content
       const startTokens = [
         { type: 'idea', token: '[IDEA_START]', end: '[IDEA_END]' },
@@ -809,58 +843,83 @@ export default {
         })
         if (!next) break
 
+        // 提取 [IDEA_START] 或 [SCRIPT_START] 之前的说明文本
+        if (next.idx > cursor) {
+          const descText = text.substring(cursor, next.idx).trim()
+          if (descText) {
+            description = descText
+          }
+        }
+
         const segmentStart = next.idx + next.token.length
         const nextEnd = text.indexOf(next.end, segmentStart)
         const segment = text.substring(segmentStart, nextEnd === -1 ? text.length : nextEnd)
 
+        // 在新的格式中，一个IDEA_START/SCRIPT_START块内可能包含多个标题-内容对
+        // 格式：[TITLE_START]标题1[TITLE_END][CONTENT_START]内容1[CONTENT_END][TITLE_START]标题2[TITLE_END][CONTENT_START]内容2[CONTENT_END]...
         const titleStartTag = '[TITLE_START]'
         const titleEndTag = '[TITLE_END]'
-        const titleEndAltTag = '[END_TITLE]'
         const contentStartTag = '[CONTENT_START]'
         const contentEndTag = '[CONTENT_END]'
-        const contentEndAltTag = '[END_CONTENT]'
 
-        const titleStartIdx = segment.indexOf(titleStartTag)
-        const titleEndIdx = segment.indexOf(titleEndTag, titleStartIdx + titleStartTag.length)
-        const titleEndAltIdx = segment.indexOf(titleEndAltTag, titleStartIdx + titleStartTag.length)
-        const contentStartIdx = segment.indexOf(contentStartTag)
-        const contentEndIdx = segment.indexOf(contentEndTag, contentStartIdx + contentStartTag.length)
-        const contentEndAltIdx = segment.indexOf(contentEndAltTag, contentStartIdx + contentStartTag.length)
+        // 循环解析segment中的所有标题-内容对
+        let segmentCursor = 0
+        while (segmentCursor < segment.length) {
+          const titleStartIdx = segment.indexOf(titleStartTag, segmentCursor)
+          if (titleStartIdx === -1) break
 
-        if (titleStartIdx !== -1) {
-          const title = segment.substring(
-            titleStartIdx + titleStartTag.length,
-            titleEndIdx !== -1
-              ? titleEndIdx
-              : titleEndAltIdx !== -1
-                ? titleEndAltIdx
-                : contentStartIdx !== -1
-                  ? contentStartIdx
-                  : segment.length
-          )
+          // 查找标题结束标签
+          const titleEndIdx = segment.indexOf(titleEndTag, titleStartIdx + titleStartTag.length)
+          if (titleEndIdx === -1) break
 
-          let body = ''
-          if (contentStartIdx !== -1) {
-            const bodyStart = contentStartIdx + contentStartTag.length
-            const bodyEnd = contentEndIdx !== -1
-              ? contentEndIdx
-              : contentEndAltIdx !== -1
-                ? contentEndAltIdx
-                : segment.length
-            body = segment.substring(bodyStart, bodyEnd)
+          // 提取标题
+          const title = segment.substring(titleStartIdx + titleStartTag.length, titleEndIdx)
+
+          // 查找内容开始标签（应该在标题结束之后）
+          const contentStartIdx = segment.indexOf(contentStartTag, titleEndIdx + titleEndTag.length)
+          if (contentStartIdx === -1) {
+            // 如果没有找到内容开始标签，只保存标题，内容为空
+            results.push({
+              type: next.type,
+              title: cleanTags(title),
+              content: ''
+            })
+            segmentCursor = titleEndIdx + titleEndTag.length
+            continue
           }
 
+          // 查找内容结束标签
+          const contentEndIdx = segment.indexOf(contentEndTag, contentStartIdx + contentStartTag.length)
+          if (contentEndIdx === -1) {
+            // 如果没有找到内容结束标签，提取到下一个标题开始或segment结束
+            const nextTitleStart = segment.indexOf(titleStartTag, contentStartIdx + contentStartTag.length)
+            const bodyEnd = nextTitleStart !== -1 ? nextTitleStart : segment.length
+            const body = segment.substring(contentStartIdx + contentStartTag.length, bodyEnd)
+            results.push({
+              type: next.type,
+              title: cleanTags(title),
+              content: cleanTags(body)
+            })
+            segmentCursor = contentStartIdx + contentStartTag.length
+            break
+          }
+
+          // 提取内容
+          const body = segment.substring(contentStartIdx + contentStartTag.length, contentEndIdx)
           results.push({
             type: next.type,
             title: cleanTags(title),
             content: cleanTags(body)
           })
+
+          // 移动到当前内容结束之后，继续查找下一个标题-内容对
+          segmentCursor = contentEndIdx + contentEndTag.length
         }
 
         cursor = nextEnd !== -1 ? nextEnd + next.end.length : text.length
       }
 
-      return results
+      return { items: results, description: description }
     }
   },
   
@@ -1040,6 +1099,36 @@ export default {
   gap: 12px;
 }
 
+.structured-description {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 1px solid #b3d8ff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.08);
+}
+
+.structured-description-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #409eff;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.structured-description-title::before {
+  content: '📋';
+  font-size: 16px;
+}
+
+.structured-description-content {
+  color: #303133;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
 .structured-card {
   background: white;
   border: 1px solid #e4e7ed;
@@ -1160,6 +1249,33 @@ export default {
 }
 
 .structured-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message-description {
+  padding: 12px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-left: 3px solid #409eff;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.description-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #409eff;
+  margin-bottom: 6px;
+}
+
+.description-content {
+  color: #303133;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.title-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;

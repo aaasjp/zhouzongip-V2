@@ -36,10 +36,11 @@ scripts_gen_prompt = """
 2. 沉稳而具亲和力：自信沉稳，通过问候和互动拉近距离。
 
 ## 输出要求
-输出三个短视频剧本，剧本内容要符合剧本风格个性，要符合角色定位与说话风格。
-输出格式：[SCRIPT_START][TITLE_START]标题1[TITLE_END][CONTENT_START]剧本内容1[CONTENT_END][SCRIPT_END][SCRIPT_START][TITLE_START]标题2[TITLE_END][CONTENT_START]剧本内容2[CONTENT_END][SCRIPT_END][SCRIPT_START][TITLE_START]标题3[TITLE_END][CONTENT_START]剧本内容3[CONTENT_END][SCRIPT_END]
+输出两个短视频剧本，剧本内容要符合剧本风格个性，要符合角色定位与说话风格。
+输出格式：剧本总体说明+[SCRIPT_START][TITLE_START]标题1[TITLE_END][CONTENT_START]剧本内容1[CONTENT_END][TITLE_START]标题2[TITLE_END][CONTENT_START]剧本内容2[CONTENT_END][SCRIPT_END]
 
 ## 示例剧本
+剧本总体说明：以下两个短视频剧本旨在通过不同的角度展示海尔热水器的卓越性能和技术优势，同时结合周总理工男的技术专家形象，以吸引年轻用户和小红书群体的关注。每个剧本都力求在视觉冲击力、品牌优势展现以及角色契合度上达到最佳效果，并且融入了参与感、玩家感等元素来增强用户体验。
 [SCRIPT_START]
 [TITLE_START]关于洗澡这件小事  安全绝对是头等大事[TITLE_END]
 [CONTENT_START]
