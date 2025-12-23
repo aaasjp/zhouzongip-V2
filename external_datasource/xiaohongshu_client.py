@@ -100,6 +100,8 @@ class XiaoHongShuClient:
             
             # 解析响应数据
             result = response.json()
+
+            logger.info(f"小红书搜索结果: {result}")
             
             logger.info(f"小红书搜索成功，返回 {len(result.get('info_list', []))} 条结果")
             
