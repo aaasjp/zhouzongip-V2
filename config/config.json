@@ -1,8 +1,8 @@
 {
   "llm": {
-    "model": "qwen-max",
-    "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    "api_key": "sk-5fcb8bf650804a4f8c1918dbb008d2ad"
+    "model": "qwen3-235b-a22b",
+    "base_url": "https://mgallery.haier.net/v1",
+    "api_key": "sk-IrTGDWBvflR3iKCr127449E60119437589937d077bE3B31b"
   },
   "milvus": {
     "host": "127.0.0.1",

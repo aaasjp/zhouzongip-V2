@@ -96,7 +96,9 @@ class LlmService:
             'temperature': 0.01,
             'max_tokens': 8192,
             #'repetition_penalty': 1.05,
-            #'chat_template_kwargs': {'enable_thinking': False},
+            'extra_body': {
+                "chat_template_kwargs": {"enable_thinking": False}
+            },
             'stream': False
         }
         

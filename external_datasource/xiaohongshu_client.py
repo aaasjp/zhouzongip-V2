@@ -91,7 +91,10 @@ class XiaoHongShuClient:
             response = requests.post(
                 self.keyword_search_url,
                 json=params,
-                headers={"Content-Type": "application/json"},
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "b5f8d3a1c7e2496b8f0d2c4a3e7b9f12"
+                },
                 timeout=30
             )
             
