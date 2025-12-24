@@ -5,7 +5,7 @@
     "api_key": "sk-IrTGDWBvflR3iKCr127449E60119437589937d077bE3B31b"
   },
   "milvus": {
-    "host": "127.0.0.1",
+    "host": "10.249.238.111",
     "port": 19530
   },
   "api_server": {
@@ -42,29 +42,29 @@
     "rrf_similarity_threshold": 0.03
   },
   "search_limit": 3,
-  "embedding_model_path": "BAAI/bge-large-zh-v1.5",
+  "embedding_model_path": "/data/gaoguanip_project/models/bge-large-zh-v1.5",
   "split": {
     "chunk_size": 2000,
     "overlap": 100
   },
   "mysql": {
-    "host": "127.0.0.1",
+    "host": "10.249.238.111",
     "port": 3306,
     "user": "admin",
     "password": "admin123",
     "db_name": "gaoguanip"
   },
   "ocr_service": {
-    "base_url": "http://172.17.10.144:8000",
+    "base_url": "http://10.249.238.111:8000",
     "parse_mode": "accuracy",
     "timeout": 3000
   },
   "minio": {
-    "endpoint": "220.154.134.61:9000",
+    "endpoint": "10.249.238.111:19000",
     "access_key": "minioadmin",
     "secret_key": "minioadmin123",
     "secure": false,
     "bucket_name": "gaoguanip-files",
-    "base_url": "http://220.154.134.61:9000"
+    "base_url": "http://10.249.238.111:19000"
   }
 }

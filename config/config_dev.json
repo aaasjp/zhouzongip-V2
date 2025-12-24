@@ -1,8 +1,8 @@
 {
   "llm": {
-    "model": "Qwen2.5-72B-Instruct",
-    "base_url": "http://10.249.238.110:8009/v1",
-    "api_key": "EMPTY"
+    "model": "qwen3-235b-a22b",
+    "base_url": "https://mgallery.haier.net/v1",
+    "api_key": "sk-IrTGDWBvflR3iKCr127449E60119437589937d077bE3B31b"
   },
   "milvus": {
     "host": "127.0.0.1",
@@ -13,9 +13,9 @@
     "port": 8003
   },
   "name_convention": {
-    "global_database": "MilvusDB_Global",
-    "global_collection_qa": "Collection_QA_Global",
-    "global_collection_doc": "Collection_DOC_Global"
+    "global_database": "MilvusDB_Global_GaoguanIP",
+    "global_collection_qa": "Collection_QA_Global_GaoguanIP",
+    "global_collection_doc": "Collection_DOC_Global_GaoguanIP"
   },
   "index_params": {
     "metric_type": "COSINE",
@@ -35,9 +35,14 @@
   },
   "hybrid_search": {
     "default_use_hybrid": true,
-    "rrf_k": 20
+    "rrf_k": 60
   },
-  "embedding_model_path": "/workspace/embeddings/bge-large-zh-v1.5",
+  "similarity_thresholds": {
+    "vector_similarity_threshold": 0.75,
+    "rrf_similarity_threshold": 0.03
+  },
+  "search_limit": 3,
+  "embedding_model_path": "BAAI/bge-large-zh-v1.5",
   "split": {
     "chunk_size": 2000,
     "overlap": 100
@@ -47,7 +52,7 @@
     "port": 3306,
     "user": "admin",
     "password": "admin123",
-    "db_name": "ai_helper"
+    "db_name": "gaoguanip"
   },
   "ocr_service": {
     "base_url": "http://172.17.10.144:8000",
@@ -59,7 +64,7 @@
     "access_key": "minioadmin",
     "secret_key": "minioadmin123",
     "secure": false,
-    "bucket_name": "forum-files",
+    "bucket_name": "gaoguanip-files",
     "base_url": "http://220.154.134.61:9000"
   }
 }
