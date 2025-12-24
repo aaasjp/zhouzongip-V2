@@ -8,11 +8,11 @@ export default defineConfig({
     port: 8002,
     proxy: {
       '/vector_db_service': {
-        target: 'http://10.249.238.111:8003',
+        target: 'http://localhost:8003',
         changeOrigin: true
       },
       '/chat_service': {
-        target: 'http://10.249.238.111:8003',
+        target: 'http://localhost:8003',
         changeOrigin: true
       }
     }
