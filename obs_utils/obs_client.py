@@ -23,13 +23,15 @@ CONFIG = load_config()
 
 # OBS配置（从config.json读取）
 OBS_CONFIG = CONFIG.get('obs', {
-    'endpoint': 'http://10.250.0.3',
+    'endpoint': 'https://203.0.113.1',
     'access_key': 'SNEIPXFWBJMMXE8IH4RL',
     'secret_key': 'P5RN40MY9jyuFV6WlbiGsD0BsSgltwkzTwZrPjxf',
     'bucket_name': 'gaoguanip-files',
+    'base_url': 'https://obs-s03238-0001.obs.cn-east-338.hehcso.com',
     'activate': True  # 默认启用OBS
 })
 
+print(json.dumps(OBS_CONFIG, indent=4))
 # 创建OBS客户端实例
 obs_client = ObsClient(
     access_key_id=OBS_CONFIG['access_key'],
@@ -43,7 +45,8 @@ def ensure_bucket_exists():
     try:
         # 检查桶是否存在
         resp = obs_client.headBucket(OBS_CONFIG['bucket_name'])
-        
+
+        print(f"ensure_bucket_exists headBucket resp: {json.dumps(resp, indent=4)}")
         # 返回码为2xx时，桶存在
         if resp.status < 300:
             print(f"存储桶 '{OBS_CONFIG['bucket_name']}' 已存在")
@@ -135,7 +138,7 @@ def upload_file(file_data: bytes, file_name: str, content_type: Optional[str] = 
         if resp.status < 300:
             # 构建文件访问URL
             # OBS的URL格式通常是: http://endpoint/bucket_name/object_name
-            endpoint = OBS_CONFIG['endpoint'].rstrip('/')
+            endpoint = OBS_CONFIG['base_url'].rstrip('/')
             url = f"{endpoint}/{OBS_CONFIG['bucket_name']}/{object_name}"
             return url
         else:
@@ -203,3 +206,56 @@ def delete_file(object_name: str) -> bool:
         print(traceback.format_exc())
         return False
 
+
+def main():
+    """测试上传功能"""
+    print("=" * 50)
+    print("开始测试OBS文件上传功能")
+    print("=" * 50)
+    
+    try:
+        # 创建测试文件内容
+        test_content = f"这是一个测试文件\n上传时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n测试内容: Hello OBS!"
+        file_data = test_content.encode('utf-8')
+        file_name = "test_upload.md"
+        content_type = "text/plain; charset=utf-8"
+        
+        print(f"\n准备上传文件: {file_name}")
+        print(f"文件大小: {len(file_data)} 字节")
+        print(f"内容类型: {content_type}")
+        
+        # 执行上传
+        url = upload_file(file_data, file_name, content_type)
+        
+        print(f"\n✓ 上传成功！")
+        print(f"文件访问URL: {url}")
+        
+        # 从URL中提取对象名称（用于后续测试）
+        # URL格式: http://endpoint/bucket_name/object_name
+        if url:
+            parts = url.split('/')
+            if len(parts) >= 2:
+                object_name = '/'.join(parts[-1:])  # 获取最后一个部分作为对象名
+                print(f"\n对象名称: {object_name}")
+                
+                # 可选：测试获取预签名URL
+                try:
+                    signed_url = get_file_url(object_name, expires_seconds=3600)
+                    print(f"\n预签名URL (1小时有效): {signed_url}")
+                except Exception as e:
+                    print(f"\n获取预签名URL失败: {e}")
+        
+        print("\n" + "=" * 50)
+        print("测试完成")
+        print("=" * 50)
+        
+    except Exception as e:
+        print(f"\n✗ 测试失败: {e}")
+        print(traceback.format_exc())
+        return 1
+    
+    return 0
+
+
+if __name__ == "__main__":
+    exit(main())

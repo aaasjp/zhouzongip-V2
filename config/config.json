@@ -60,10 +60,11 @@
     "timeout": 3000
   },
   "obs": {
-    "endpoint": "http://10.250.0.3",
+    "endpoint": "https://203.0.113.1",
     "access_key": "SNEIPXFWBJMMXE8IH4RL",
     "secret_key": "P5RN40MY9jyuFV6WlbiGsD0BsSgltwkzTwZrPjxf",
     "bucket_name": "gaoguanip-files",
+    "base_url": "https://obs-s03238-0001.obs.cn-east-338.hehcso.com",
     "activate": true
   },
   "minio": {
