@@ -34,7 +34,7 @@ class MySQLHelper:
         self.port = MYSQL_CONFIG.get('port', 3306)
         self.user = MYSQL_CONFIG.get('user', 'root')
         self.password = MYSQL_CONFIG.get('password', '')
-        self.db_name = MYSQL_CONFIG.get('db_name', 'ai_helper')
+        self.db_name = MYSQL_CONFIG.get('db_name', 'gaoguanip')
         self.connection = None
         
     def _log_sql(self, sql: str, params: tuple = None):
@@ -70,6 +70,42 @@ class MySQLHelper:
         if params:
             logger.debug(f"[MySQL参数] params={params}")
         
+    def _ensure_database_exists(self):
+        """确保数据库存在，如果不存在则创建"""
+        try:
+            # 先连接到MySQL服务器（不指定数据库）
+            temp_conn = mysql.connector.connect(
+                host=self.host,
+                port=self.port,
+                user=self.user,
+                password=self.password,
+                charset='utf8mb4',
+                collation='utf8mb4_unicode_ci'
+            )
+            cursor = temp_conn.cursor()
+            
+            # 检查数据库是否存在
+            check_db_sql = "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = %s"
+            cursor.execute(check_db_sql, (self.db_name,))
+            db_exists = cursor.fetchone() is not None
+            
+            if not db_exists:
+                # 创建数据库
+                create_db_sql = f"CREATE DATABASE IF NOT EXISTS `{self.db_name}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+                logger.info(f"[MySQL数据库] 数据库不存在，正在创建: {self.db_name}")
+                cursor.execute(create_db_sql)
+                temp_conn.commit()
+                logger.info(f"[MySQL数据库] 数据库创建成功: {self.db_name}")
+            else:
+                logger.info(f"[MySQL数据库] 数据库已存在: {self.db_name}")
+            
+            cursor.close()
+            temp_conn.close()
+            return True
+        except Error as e:
+            logger.error(f"[MySQL数据库] 检查/创建数据库失败: {e}")
+            return False
+    
     def _get_connection(self):
         """获取数据库连接"""
         try:
@@ -87,8 +123,32 @@ class MySQLHelper:
                 logger.info(f"[MySQL连接] 数据库连接成功: {self.host}:{self.port}/{self.db_name}")
             return self.connection
         except Error as e:
-            logger.error(f"[MySQL连接] 连接MySQL数据库失败: host={self.host}:{self.port}, db={self.db_name}, error={e}")
-            raise
+            # 检查是否是数据库不存在的错误（错误码1049）
+            if e.errno == 1049:
+                logger.warning(f"[MySQL连接] 数据库不存在，尝试创建: {self.db_name}")
+                if self._ensure_database_exists():
+                    # 数据库创建成功，重新尝试连接
+                    try:
+                        self.connection = mysql.connector.connect(
+                            host=self.host,
+                            port=self.port,
+                            user=self.user,
+                            password=self.password,
+                            database=self.db_name,
+                            charset='utf8mb4',
+                            collation='utf8mb4_unicode_ci'
+                        )
+                        logger.info(f"[MySQL连接] 数据库连接成功: {self.host}:{self.port}/{self.db_name}")
+                        return self.connection
+                    except Error as retry_e:
+                        logger.error(f"[MySQL连接] 创建数据库后连接失败: {retry_e}")
+                        raise
+                else:
+                    logger.error(f"[MySQL连接] 无法创建数据库: {self.db_name}")
+                    raise
+            else:
+                logger.error(f"[MySQL连接] 连接MySQL数据库失败: host={self.host}:{self.port}, db={self.db_name}, error={e}")
+                raise
     
     def close(self):
         """关闭数据库连接"""

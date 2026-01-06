@@ -59,12 +59,20 @@
     "parse_mode": "accuracy",
     "timeout": 3000
   },
+  "obs": {
+    "endpoint": "http://10.250.0.3",
+    "access_key": "SNEIPXFWBJMMXE8IH4RL",
+    "secret_key": "P5RN40MY9jyuFV6WlbiGsD0BsSgltwkzTwZrPjxf",
+    "bucket_name": "gaoguanip-files",
+    "activate": true
+  },
   "minio": {
     "endpoint": "220.154.134.61:9000",
     "access_key": "minioadmin",
     "secret_key": "minioadmin123",
     "secure": false,
     "bucket_name": "gaoguanip-files",
-    "base_url": "http://220.154.134.61:9000"
+    "base_url": "http://220.154.134.61:9000",
+    "activate": false
   }
 }

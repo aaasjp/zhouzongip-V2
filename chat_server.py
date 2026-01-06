@@ -16,7 +16,7 @@ from llm.llm_service import LlmService
 from milvus.miluvs_helper import search_from_collection
 from utils.file_loader import extract_content_from_file
 from chat.chat_service import ChatService
-from minio_utils.minio_client import upload_file
+from storage_utils.storage_client import upload_file
 from config.log_config import setup_chat_service_logging
 from prompts.idea_gen import idea_gen_prompt
 from prompts.scripts_gen import scripts_gen_prompt
@@ -834,7 +834,7 @@ def restore_session(session_id):
 
 @chat_bp.route('/chat_service/upload', methods=['POST'])
 def upload_document():
-    """上传文档到MinIO"""
+    """上传文档到存储服务（OBS或MinIO）"""
     if 'file' not in request.files:
         return jsonify({'status': 'fail', 'msg': '缺少文件', 'code': 400, 'data': ''})
     
@@ -850,8 +850,8 @@ def upload_document():
         # 获取文件MIME类型
         content_type = file.content_type or 'application/octet-stream'
         
-        # 上传到MinIO
-        file_url = upload_file(file_data, file_name, content_type)
+            # 上传到存储服务（根据配置自动选择OBS或MinIO）
+            file_url = upload_file(file_data, file_name, content_type)
         
         return jsonify({
             'status': 'success',
@@ -908,7 +908,7 @@ def upload_and_parse_document():
             # 获取文件MIME类型
             content_type = file.content_type or 'application/octet-stream'
             
-            # 上传到MinIO
+            # 上传到存储服务（根据配置自动选择OBS或MinIO）
             logger.info(f"开始上传文档: {file_name}")
             file_url = upload_file(file_data, file_name, content_type)
             

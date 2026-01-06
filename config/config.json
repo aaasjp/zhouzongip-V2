@@ -48,10 +48,10 @@
     "overlap": 100
   },
   "mysql": {
-    "host": "10.249.238.111",
+    "host": "10.218.17.210",
     "port": 3306,
-    "user": "admin",
-    "password": "admin123",
+    "user": "brand_ai",
+    "password": "U!3pfaU!l9zL",
     "db_name": "gaoguanip"
   },
   "ocr_service": {
@@ -59,12 +59,20 @@
     "parse_mode": "accuracy",
     "timeout": 3000
   },
+  "obs": {
+    "endpoint": "http://10.250.0.3",
+    "access_key": "SNEIPXFWBJMMXE8IH4RL",
+    "secret_key": "P5RN40MY9jyuFV6WlbiGsD0BsSgltwkzTwZrPjxf",
+    "bucket_name": "gaoguanip-files",
+    "activate": true
+  },
   "minio": {
     "endpoint": "10.249.238.111:19000",
     "access_key": "minioadmin",
     "secret_key": "minioadmin123",
     "secure": false,
     "bucket_name": "gaoguanip-files",
-    "base_url": "http://10.249.238.111:19000"
+    "base_url": "http://10.249.238.111:19000",
+    "activate": false
   }
 }
