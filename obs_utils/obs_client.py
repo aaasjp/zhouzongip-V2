@@ -7,9 +7,11 @@ import os
 import re
 import uuid
 import traceback
+import asyncio
 from io import BytesIO
 from datetime import datetime
 from typing import Optional
+import aiohttp
 from obs import ObsClient, CreateBucketHeader, HeadPermission, PutObjectHeader
 
 # 从config.json读取OBS配置
@@ -23,10 +25,11 @@ CONFIG = load_config()
 
 # OBS配置（从config.json读取）
 OBS_CONFIG = CONFIG.get('obs', {
-    'endpoint': 'https://203.0.113.1',
+    'endpoint': 'https://obs.cn-east-338.hehcso.com',
     'access_key': 'SNEIPXFWBJMMXE8IH4RL',
     'secret_key': 'P5RN40MY9jyuFV6WlbiGsD0BsSgltwkzTwZrPjxf',
-    'bucket_name': 'gaoguanip-files',
+    'bucket_name': 'obs-s03238-0001',
+    'secure': False,
     'base_url': 'https://obs-s03238-0001.obs.cn-east-338.hehcso.com',
     'activate': True  # 默认启用OBS
 })
@@ -36,7 +39,8 @@ print(json.dumps(OBS_CONFIG, indent=4))
 obs_client = ObsClient(
     access_key_id=OBS_CONFIG['access_key'],
     secret_access_key=OBS_CONFIG['secret_key'],
-    server=OBS_CONFIG['endpoint']
+    server=OBS_CONFIG['endpoint'],
+    is_secure=OBS_CONFIG['secure']
 )
 
 
@@ -151,66 +155,108 @@ def upload_file(file_data: bytes, file_name: str, content_type: Optional[str] = 
         print(traceback.format_exc())
         raise
 
-
-def get_file_url(object_name: str, expires_seconds: int = 604800) -> str:
+def download_file(object_name: str) -> bytes:
     """
-    获取文件的预签名URL
+    从OBS下载文件
     
     Args:
-        object_name: OBS中的对象名称（路径）
-        expires_seconds: URL有效期（秒），默认7天
+        object_name: 对象名称（文件在OBS中的路径）
     
     Returns:
-        文件的预签名URL
+        文件的二进制数据
     """
     try:
-        resp = obs_client.createSignedUrl(
-            method='GET',
-            bucketName=OBS_CONFIG['bucket_name'],
-            objectKey=object_name,
-            expires=expires_seconds
+        resp = obs_client.getContent(
+            OBS_CONFIG['bucket_name'],
+            object_name
         )
         
+        # 返回码为2xx时，接口调用成功
         if resp.status < 300:
-            return resp.body.signedUrl
+            return resp.body.buffer
         else:
-            error_msg = f"获取文件URL失败: status={resp.status}, errorCode={resp.errorCode}, errorMessage={resp.errorMessage}"
+            error_msg = f"下载文件失败: status={resp.status}, errorCode={resp.errorCode}, errorMessage={resp.errorMessage}"
             print(error_msg)
             raise Exception(error_msg)
+        
     except Exception as e:
-        print(f"获取文件URL时出错: {e}")
+        print(f"从OBS下载文件时出错: {e}")
         print(traceback.format_exc())
         raise
 
 
-def delete_file(object_name: str) -> bool:
+async def download_file_with_aiohttp(url: str) -> bytes:
     """
-    删除OBS中的文件
+    使用aiohttp下载文件
     
     Args:
-        object_name: OBS中的对象名称（路径）
+        url: 文件的完整访问URL
     
     Returns:
-        是否删除成功
+        文件的二进制数据
     """
     try:
-        resp = obs_client.deleteObject(OBS_CONFIG['bucket_name'], object_name)
-        
-        if resp.status < 300:
-            return True
-        else:
-            print(f"删除文件失败: status={resp.status}, errorCode={resp.errorCode}, errorMessage={resp.errorMessage}")
-            return False
-    except Exception as e:
-        print(f"删除文件时出错: {e}")
+        # 创建不验证SSL证书的连接器（用于处理自签名证书）
+        connector = aiohttp.TCPConnector(ssl=False)
+        async with aiohttp.ClientSession(connector=connector) as session:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    downloaded_data = await response.read()
+                    return downloaded_data
+                else:
+                    error_msg = f"下载文件失败: HTTP状态码={response.status}"
+                    print(error_msg)
+                    raise Exception(error_msg)
+    except aiohttp.ClientError as e:
+        error_msg = f"aiohttp下载文件时出错: {e}"
+        print(error_msg)
         print(traceback.format_exc())
-        return False
+        raise Exception(error_msg)
+    except Exception as e:
+        error_msg = f"下载文件时出错: {e}"
+        print(error_msg)
+        print(traceback.format_exc())
+        raise
+
+
+def extract_object_name_from_url(url: str) -> str:
+    """
+    从URL中提取对象名称
+    
+    Args:
+        url: 文件的完整访问URL
+    
+    Returns:
+        对象名称
+    """
+    # URL格式: {base_url}/{bucket_name}/{object_name}
+    # 例如: https://obs-s03238-0001.obs.cn-east-338.hehcso.com/obs-s03238-0001/2024-01-01-test-uuid.txt
+    base_url = OBS_CONFIG['base_url'].rstrip('/')
+    bucket_name = OBS_CONFIG['bucket_name']
+    
+    # 移除base_url前缀
+    if url.startswith(base_url):
+        object_name = url[len(base_url) + 1:]  # +1 是为了跳过斜杠
+        # 移除bucket_name前缀
+        if object_name.startswith(bucket_name + '/'):
+            object_name = object_name[len(bucket_name) + 1:]
+        return object_name
+    else:
+        # 如果URL格式不匹配，尝试直接提取最后一个斜杠后的内容
+        parts = url.split('/')
+        # 找到bucket_name的位置，然后取后面的部分
+        try:
+            bucket_index = parts.index(bucket_name)
+            return '/'.join(parts[bucket_index + 1:])
+        except ValueError:
+            # 如果找不到bucket_name，返回最后一个部分
+            return parts[-1]
 
 
 def main():
-    """测试上传功能"""
+    """测试上传和下载功能"""
     print("=" * 50)
-    print("开始测试OBS文件上传功能")
+    print("开始测试OBS文件上传和下载功能")
     print("=" * 50)
     
     try:
@@ -230,20 +276,28 @@ def main():
         print(f"\n✓ 上传成功！")
         print(f"文件访问URL: {url}")
         
-        # 从URL中提取对象名称（用于后续测试）
-        # URL格式: http://endpoint/bucket_name/object_name
-        if url:
-            parts = url.split('/')
-            if len(parts) >= 2:
-                object_name = '/'.join(parts[-1:])  # 获取最后一个部分作为对象名
-                print(f"\n对象名称: {object_name}")
-                
-                # 可选：测试获取预签名URL
-                try:
-                    signed_url = get_file_url(object_name, expires_seconds=3600)
-                    print(f"\n预签名URL (1小时有效): {signed_url}")
-                except Exception as e:
-                    print(f"\n获取预签名URL失败: {e}")
+        # 使用aiohttp下载文件
+        print(f"\n开始使用aiohttp下载文件...")
+        print(f"下载URL: {url}")
+        
+        # 使用asyncio运行异步下载函数
+        downloaded_data = asyncio.run(download_file_with_aiohttp(url))
+        
+        print(f"✓ aiohttp下载成功！")
+        print(f"下载文件大小: {len(downloaded_data)} 字节")
+        
+        # 验证下载的内容
+        downloaded_content = downloaded_data.decode('utf-8')
+        print(f"\n下载的文件内容:")
+        print("-" * 50)
+        print(downloaded_content)
+        print("-" * 50)
+        
+        # 验证内容是否一致
+        if downloaded_data == file_data:
+            print("\n✓ 验证通过：下载的文件内容与上传的文件内容一致")
+        else:
+            print("\n✗ 警告：下载的文件内容与上传的文件内容不一致")
         
         print("\n" + "=" * 50)
         print("测试完成")
