@@ -25,12 +25,12 @@ CONFIG = load_config()
 
 # OBS配置（从config.json读取）
 OBS_CONFIG = CONFIG.get('obs', {
-    'endpoint': 'https://obs.cn-east-338.hehcso.com',
+    'endpoint': 'http://obs.cn-east-338.hehcso.com',
     'access_key': 'SNEIPXFWBJMMXE8IH4RL',
     'secret_key': 'P5RN40MY9jyuFV6WlbiGsD0BsSgltwkzTwZrPjxf',
     'bucket_name': 'obs-s03238-0001',
     'secure': False,
-    'base_url': 'https://obs-s03238-0001.obs.cn-east-338.hehcso.com',
+    'base_url': 'http://obs-s03238-0001.obs.cn-east-338.hehcso.com',
     'activate': True  # 默认启用OBS
 })
 
