@@ -60,10 +60,11 @@
     "timeout": 3000
   },
   "obs": {
-    "endpoint": "https://203.0.113.1",
+    "endpoint": "https://obs.cn-east-338.hehcso.com",
     "access_key": "SNEIPXFWBJMMXE8IH4RL",
     "secret_key": "P5RN40MY9jyuFV6WlbiGsD0BsSgltwkzTwZrPjxf",
-    "bucket_name": "gaoguanip-files",
+    "bucket_name": "obs-s03238-0001",
+    "secure": false,
     "base_url": "https://obs-s03238-0001.obs.cn-east-338.hehcso.com",
     "activate": true
   },
@@ -72,7 +73,7 @@
     "access_key": "minioadmin",
     "secret_key": "minioadmin123",
     "secure": false,
-    "bucket_name": "gaoguanip-files",
+    "bucket_name": "obs-s03238-0001",
     "base_url": "http://10.249.238.111:19000",
     "activate": false
   }

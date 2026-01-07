@@ -23,12 +23,12 @@ CONFIG = load_config()
 
 # MinIO配置（从config.json读取）
 MINIO_CONFIG = CONFIG.get('minio', {
-    'endpoint': '10.162.248.179:3003',  # 对应docker映射的端口3003:9000
+    'endpoint': '10.249.238.111:19000',  # 对应docker映射的端口3003:9000
     'access_key': 'minioadmin',
     'secret_key': 'minioadmin123',
     'secure': False,  # 使用HTTP，不使用HTTPS
-    'bucket_name': 'forum-files',  # 存储桶名称
-    'base_url': 'http://10.162.248.179:3003'  # MinIO服务的基础URL（用于构建公共访问URL）
+    'bucket_name': 'obs-s03238-0001',  # 存储桶名称
+    'base_url': 'http://10.249.238.111:19000'  # MinIO服务的基础URL（用于构建公共访问URL）
 })
 
 # 创建MinIO客户端实例

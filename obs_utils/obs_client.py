@@ -25,12 +25,12 @@ CONFIG = load_config()
 
 # OBS配置（从config.json读取）
 OBS_CONFIG = CONFIG.get('obs', {
-    'endpoint': 'http://obs.cn-east-338.hehcso.com',
+    'endpoint': 'https://obs.cn-east-338.hehcso.com',
     'access_key': 'SNEIPXFWBJMMXE8IH4RL',
     'secret_key': 'P5RN40MY9jyuFV6WlbiGsD0BsSgltwkzTwZrPjxf',
     'bucket_name': 'obs-s03238-0001',
     'secure': False,
-    'base_url': 'http://obs-s03238-0001.obs.cn-east-338.hehcso.com',
+    'base_url': 'https://obs-s03238-0001.obs.cn-east-338.hehcso.com',
     'activate': True  # 默认启用OBS
 })
 
@@ -127,6 +127,8 @@ def upload_file(file_data: bytes, file_name: str, content_type: Optional[str] = 
         headers = PutObjectHeader()
         # 设置MIME类型
         headers.contentType = content_type or 'application/octet-stream'
+        # 设置对象的ACL权限为公共读
+        headers.acl = 'public-read'
         
         # 将 bytes 转换为临时文件或直接上传
         # OBS的putFile方法需要文件路径，putContent方法可以直接上传bytes
@@ -140,10 +142,13 @@ def upload_file(file_data: bytes, file_name: str, content_type: Optional[str] = 
         
         # 返回码为2xx时，接口调用成功
         if resp.status < 300:
-            # 构建文件访问URL
-            # OBS的URL格式通常是: http://endpoint/bucket_name/object_name
-            endpoint = OBS_CONFIG['base_url'].rstrip('/')
-            url = f"{endpoint}/{OBS_CONFIG['bucket_name']}/{object_name}"
+            # 从响应中获取objectUrl字段
+            if hasattr(resp.body, 'objectUrl') and resp.body.objectUrl:
+                url = resp.body.objectUrl
+            else:
+                # 如果响应中没有objectUrl，则手动构建URL（兼容处理）
+                endpoint = OBS_CONFIG['base_url'].rstrip('/')
+                url = f"{endpoint}/{OBS_CONFIG['bucket_name']}/{object_name}"
             return url
         else:
             error_msg = f"上传文件失败: status={resp.status}, errorCode={resp.errorCode}, errorMessage={resp.errorMessage}"
